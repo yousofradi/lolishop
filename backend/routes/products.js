@@ -630,9 +630,11 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
     // Get all collections to map names
     const Collection = require('../models/Collection');
     let collections = await Collection.find({});
-    const collectionMap = {};
+    const collectionMap = new Map();
     collections.forEach(c => {
-      collectionMap[normalizeArabic(c.name)] = c._id;
+      collectionMap.set(normalizeArabic(c.name), c._id);
+      collectionMap.set(c.name.trim().toLowerCase(), c._id);
+      if (c.urlName) collectionMap.set(c.urlName.toLowerCase(), c._id);
     });
 
     const productsToSave = [];
@@ -651,8 +653,11 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
         const rawSalePrice = row['p-sale-price'] || row['sale price'] || '';
         const rawQty = (row['quantity'] || row['qty'] || '').trim();
 
+        const handle = (row['handle'] || '').trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0600-\u06FF\-]/g, '');
+
         currentProduct = {
           name: title,
+          handle,
           description: row['description'] || row['body (html)'] || '',
           basePrice: cleanPrice(rawPrice),
           salePrice: rawSalePrice ? cleanPrice(rawSalePrice) : null,
@@ -660,40 +665,87 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
           images: [],
           status: ((row['status'] || 'active').trim().toLowerCase() === 'draft') ? 'draft' : 'active',
           quantity: (rawQty === 'Available' || !rawQty) ? null : (parseInt(rawQty) || 0),
+          collectionId: null,
           collectionIds: [],
           options: [],
           variants: []
         };
 
-        const imagesVal = row['images'];
+        const imagesVal = row['images'] || row['image src'] || '';
         if (imagesVal) {
           const imgs = imagesVal.split(/\s+/).filter(url => url.startsWith('http'));
           currentProduct.images = imgs;
           currentProduct.imageUrl = imgs[0] || '';
         }
 
-        const collectionsVal = row['collections'];
+        const collectionsVal = (
+          row['collections'] ||
+          row['collection'] ||
+          row['categories'] ||
+          row['category'] ||
+          row['تصنيف'] ||
+          row['التصنيف'] ||
+          row['التصنيفات'] ||
+          ''
+        ).trim();
+
         if (collectionsVal) {
-          const names = collectionsVal.split(',').map(n => n.trim()).filter(Boolean);
-          for (const name of names) {
-            const normName = normalizeArabic(name);
-            if (collectionMap[normName]) {
-              currentProduct.collectionIds.push(collectionMap[normName]);
-            } else if (createCollections === 'true') {
+          const names = collectionsVal.split(/[,;|]/).map(n => n.trim()).filter(Boolean);
+          for (const rawName of names) {
+            const normName = normalizeArabic(rawName);
+            const lowerName = rawName.toLowerCase();
+            let colId = collectionMap.get(normName) || collectionMap.get(lowerName);
+
+            if (!colId) {
               try {
-                const newCol = new Collection({ 
-                  name, 
-                  handle: name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]/g, '') || Date.now().toString()
+                // Find existing in DB
+                let existingCol = await Collection.findOne({
+                  $or: [
+                    { name: rawName },
+                    { name: { $regex: new RegExp(`^${rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+                  ]
                 });
-                await newCol.save();
-                collectionMap[normName] = newCol._id;
-                currentProduct.collectionIds.push(newCol._id);
-              } catch (e) {
-                console.error('Failed to auto-create collection:', name, e.message);
+
+                if (existingCol) {
+                  colId = existingCol._id;
+                } else {
+                  // Auto-create missing collection
+                  const baseSlug = rawName
+                    .toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^\w\u0600-\u06FF\-]/g, '') || 'collection';
+                  let candidateUrl = baseSlug;
+                  let suffix = 1;
+                  while (await Collection.exists({ urlName: candidateUrl })) {
+                    candidateUrl = `${baseSlug}-${suffix++}`;
+                  }
+
+                  const newCol = new Collection({
+                    name: rawName,
+                    urlName: candidateUrl,
+                    sortOrder: await Collection.countDocuments()
+                  });
+                  await newCol.save();
+                  colId = newCol._id;
+                  console.log(`✅ Auto-created collection: "${rawName}" (ID: ${colId})`);
+                }
+
+                collectionMap.set(normName, colId);
+                collectionMap.set(lowerName, colId);
+              } catch (colErr) {
+                console.error(`Failed to create or find collection "${rawName}":`, colErr.message);
               }
             }
+
+            if (colId && !currentProduct.collectionIds.some(id => id.toString() === colId.toString())) {
+              currentProduct.collectionIds.push(colId);
+            }
           }
+
+          // Assign primary collectionId
+          currentProduct.collectionId = currentProduct.collectionIds[0] || null;
         }
+
         productsToSave.push(currentProduct);
       }
 
@@ -769,10 +821,38 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
       }
     }
 
-    try { fs.unlinkSync(req.file.path); } catch(e) {}
-    if (createCollections === 'true') {
-      try { require('./collectionRoutes').clearCache(); } catch (e) {}
+    // 4. Update collections productOrder and image if empty
+    for (const [, colId] of collectionMap.entries()) {
+      try {
+        const matchingProducts = await Product.find({
+          $or: [{ collectionId: colId }, { collectionIds: colId }]
+        }).sort({ sortOrder: 1 }).select('_id imageUrl images');
+
+        if (matchingProducts.length > 0) {
+          const productIds = matchingProducts.map(p => p._id);
+          const colDoc = await Collection.findById(colId);
+          if (colDoc) {
+            colDoc.productOrder = productIds;
+            if (!colDoc.imageUrl) {
+              const firstImgProd = matchingProducts.find(p => p.imageUrl || (Array.isArray(p.images) && p.images[0]));
+              if (firstImgProd) {
+                colDoc.imageUrl = firstImgProd.imageUrl || firstImgProd.images[0];
+              }
+            }
+            await colDoc.save();
+          }
+        }
+      } catch (err) {
+        console.error('Error updating collection products:', err.message);
+      }
     }
+
+    try { fs.unlinkSync(req.file.path); } catch(e) {}
+    
+    // Invalidate caches
+    await cache.del('storefront:collections:list');
+    await cache.clearPrefix('storefront:collection:');
+    await cache.clearPrefix('storefront:products:list:');
 
     res.json({ message: `تم استيراد ${productsToSave.length} منتج بنجاح`, count: productsToSave.length });
   } catch (err) {
