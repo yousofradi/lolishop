@@ -3,7 +3,7 @@
   const cachedName = localStorage.getItem('admin_store_name');
   const cachedColor = localStorage.getItem('admin_primary_color');
   let cachedLogo = localStorage.getItem('admin_store_logo') || localStorage.getItem('loli_store_logo');
-  if (cachedLogo && (cachedLogo.includes('sundura') || cachedLogo.includes('wuiltstore') || cachedLogo.includes('cmo1'))) {
+  if (cachedLogo && (cachedLogo.includes('sundura') || cachedLogo.includes('wuiltstore') || cachedLogo.includes('cmo1') || cachedLogo.includes('/uploads/'))) {
     localStorage.removeItem('admin_store_logo');
     localStorage.removeItem('loli_store_logo');
     localStorage.removeItem('sundura_store_logo');
@@ -27,7 +27,7 @@
       style.textContent = `.admin-nav a.active { background: ${cachedColor}15 !important; color: ${cachedColor} !important; } .admin-nav a.active svg { color: ${cachedColor} !important; }`;
       if (!document.getElementById('dynamic-primary-style')) document.head.appendChild(style);
     }
-    const activeLogo = cachedLogo || '/assets/logo.webp';
+    const activeLogo = cachedLogo || '/assets/logo.webp?v=20260927_v3';
     document.querySelectorAll('.store-logo-img').forEach(img => img.src = activeLogo);
     const loginLogo = document.getElementById('login-brand-logo');
     if (loginLogo) loginLogo.innerHTML = `<img src="${activeLogo}" style="max-height:100%; max-width:150px; display:block; margin:0 auto;">`;
@@ -568,8 +568,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settings) {
       // 1. Logo
       if (settings.storeLogo) {
-        if (settings.storeLogo.includes('sundura') || settings.storeLogo.includes('wuiltstore') || settings.storeLogo.includes('cmo1')) {
-          settings.storeLogo = '/assets/logo.webp';
+        if (!settings.storeLogo || settings.storeLogo.includes('sundura') || settings.storeLogo.includes('wuiltstore') || settings.storeLogo.includes('cmo1') || settings.storeLogo.includes('/uploads/')) {
+          settings.storeLogo = '/assets/logo.webp?v=20260927_v3';
         }
         localStorage.setItem('loli_store_logo', settings.storeLogo);
         document.querySelectorAll('.store-logo-img').forEach(img => {

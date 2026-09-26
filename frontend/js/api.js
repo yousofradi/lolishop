@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderBlock = (list) => list.map(c => `
           <a href="/collection/${c.urlName || c._id}" class="cat-badge">
             <div class="cat-badge-img-wrapper">
-              <img src="${api.optimizeImageUrl(c.imageUrl, 100) || '/assets/logo.webp'}" alt="${c.name}" loading="lazy" decoding="async">
+              <img src="${api.optimizeImageUrl(c.imageUrl, 100) || '/assets/logo.webp?v=20260927_v3'}" alt="${c.name}" loading="lazy" decoding="async">
             </div>
             <span class="cat-badge-name">${c.name}</span>
           </a>
