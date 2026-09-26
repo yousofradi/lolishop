@@ -285,7 +285,8 @@ const api = {
   uploadFile(file, onProgress, prefix) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE}/upload`, true);
+      const base = getNormalizedApiBase();
+      xhr.open('POST', `${base}/upload`, true);
       xhr.setRequestHeader('x-admin-key', this._adminKey());
 
       if (onProgress && xhr.upload) {

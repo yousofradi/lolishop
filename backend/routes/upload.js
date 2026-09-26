@@ -17,57 +17,110 @@ const GiftCollection = require('../models/GiftCollection');
 // ── Storage Configuration ────────────────────────────────
 
 // Check for Cloudinary credentials
-const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
+const isCloudinaryConfigured = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
   process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET;
+  process.env.CLOUDINARY_API_SECRET
+);
 
-let storage;
-
-if (isR2Configured) {
-  // If R2 is configured, we use memory storage so sharp can process the buffer
-  storage = multer.memoryStorage();
-  console.log('✅ Upload: Using Cloudflare R2 storage (MemoryBuffer -> Sharp -> R2)');
-} else if (isCloudinaryConfigured) {
-  // Cloudinary Storage (Persistent)
+if (isCloudinaryConfigured) {
   cloudinaryPackage.v2.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
   });
+  console.log('✅ Upload: Cloudinary configured');
+}
 
-  storage = new CloudinaryStorage({
-    cloudinary: cloudinaryPackage,
-    params: {
-      folder: 'ecommerce-uploads',
-      format: 'webp',
-      transformation: [
-        { width: 800, crop: 'limit' },
-        { quality: 'auto:good' }
-      ]
-    }
+// Memory storage allows us to optimize with Sharp and try R2 -> Cloudinary -> Local Disk seamlessly
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+async function uploadToCloudinaryBuffer(buffer, folder = 'ecommerce-uploads') {
+  if (!isCloudinaryConfigured) return null;
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinaryPackage.v2.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'image',
+        format: 'webp',
+        transformation: [
+          { width: 800, crop: 'limit' },
+          { quality: 'auto:good' }
+        ]
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url || result.url);
+      }
+    );
+    uploadStream.end(buffer);
   });
-  console.log('✅ Upload: Using Cloudinary storage with pre-compression');
-} else {
-  // Local Disk Storage (Fallback - NOT persistent on ephemeral platforms)
+}
+
+async function saveToDisk(buffer, originalName, req) {
   const uploadDir = path.join(__dirname, '../uploads');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
 
-  storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-  });
-  console.log('⚠️ Upload: Cloudinary and R2 not configured, using local disk storage');
+  let finalBuffer = buffer;
+  let ext = '.webp';
+  try {
+    const sharp = require('sharp');
+    finalBuffer = await sharp(buffer)
+      .resize(800, null, { withoutEnlargement: true, fit: 'inside' })
+      .webp({ quality: 80 })
+      .toBuffer();
+  } catch (e) {
+    ext = path.extname(originalName) || '.png';
+  }
+
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  const cleanName = path.basename(originalName, path.extname(originalName)).replace(/[^a-zA-Z0-9]/g, '') || 'image';
+  const fname = `${cleanName}-${uniqueSuffix}${ext}`;
+  const filePath = path.join(uploadDir, fname);
+  await fs.promises.writeFile(filePath, finalBuffer);
+
+  const host = req.get('host');
+  const protocol = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
+  const finalProtocol = (host.includes('render.com') || host.includes('onrender.com')) ? 'https' : protocol;
+  return {
+    url: `${finalProtocol}://${host}/uploads/${fname}`,
+    filename: fname
+  };
 }
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-});
+async function handleFileUpload(file, folder, prefix, req) {
+  // 1. Try Cloudflare R2
+  if (isR2Configured) {
+    try {
+      const imageUrl = await uploadToR2(file.buffer, file.originalname, folder, prefix);
+      return { url: imageUrl, filename: path.basename(imageUrl) };
+    } catch (r2Err) {
+      console.error('⚠️ R2 upload failed (Access Denied / error):', r2Err.message);
+    }
+  }
+
+  // 2. Try Cloudinary
+  if (isCloudinaryConfigured) {
+    try {
+      const cloudUrl = await uploadToCloudinaryBuffer(file.buffer, folder);
+      if (cloudUrl) {
+        return { url: cloudUrl, filename: path.basename(cloudUrl) };
+      }
+    } catch (cloudErr) {
+      console.error('⚠️ Cloudinary upload fallback failed:', cloudErr.message);
+    }
+  }
+
+  // 3. Fallback to Disk Storage
+  console.log('ℹ️ Using local disk storage fallback for upload');
+  return await saveToDisk(file.buffer, file.originalname, req);
+}
 
 // ── Routes ───────────────────────────────────────────────
 
@@ -78,34 +131,12 @@ router.post('/', adminAuth, upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    let imageUrl = '';
-    let filename = '';
-
-    if (isR2Configured) {
-      const folder = req.body.folder || 'lolishop';
-      const prefix = req.body.prefix || '';
-      imageUrl = await uploadToR2(req.file.buffer, req.file.originalname, folder, prefix);
-      filename = path.basename(imageUrl);
-    } else {
-      imageUrl = req.file.path || req.file.secure_url || req.file.url;
-      filename = req.file.filename || req.file.public_id;
-
-      if (isCloudinaryConfigured) {
-        const { optimizeCloudinaryUrl } = require('../utils/cloudinary');
-        if (typeof imageUrl === 'string') {
-          imageUrl = imageUrl.replace(/\.(png|jpe?g|gif)$/i, '.webp');
-          imageUrl = optimizeCloudinaryUrl(imageUrl);
-        }
-      } else {
-        const host = req.get('host');
-        const protocol = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
-        const finalProtocol = (host.includes('render.com') || host.includes('onrender.com')) ? 'https' : protocol;
-        imageUrl = `${finalProtocol}://${host}/uploads/${req.file.filename}`;
-      }
-    }
-
-    res.json({ url: imageUrl, filename });
+    const folder = req.body.folder || 'lolishop';
+    const prefix = req.body.prefix || '';
+    const result = await handleFileUpload(req.file, folder, prefix, req);
+    res.json(result);
   } catch (err) {
+    console.error('Upload failed completely:', err);
     res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
 });
@@ -117,34 +148,12 @@ router.post('/public', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    let imageUrl = '';
-    let filename = '';
-
-    if (isR2Configured) {
-      const folder = req.body.folder || 'transactions';
-      const prefix = req.body.prefix || '';
-      imageUrl = await uploadToR2(req.file.buffer, req.file.originalname, folder, prefix);
-      filename = path.basename(imageUrl);
-    } else {
-      imageUrl = req.file.path || req.file.secure_url || req.file.url;
-      filename = req.file.filename || req.file.public_id;
-
-      if (isCloudinaryConfigured) {
-        const { optimizeCloudinaryUrl } = require('../utils/cloudinary');
-        if (typeof imageUrl === 'string') {
-          imageUrl = imageUrl.replace(/\.(png|jpe?g|gif)$/i, '.webp');
-          imageUrl = optimizeCloudinaryUrl(imageUrl);
-        }
-      } else {
-        const host = req.get('host');
-        const protocol = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
-        const finalProtocol = (host.includes('render.com') || host.includes('onrender.com')) ? 'https' : protocol;
-        imageUrl = `${finalProtocol}://${host}/uploads/${req.file.filename}`;
-      }
-    }
-
-    res.json({ url: imageUrl, filename });
+    const folder = req.body.folder || 'transactions';
+    const prefix = req.body.prefix || '';
+    const result = await handleFileUpload(req.file, folder, prefix, req);
+    res.json(result);
   } catch (err) {
+    console.error('Public upload failed completely:', err);
     res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
 });

@@ -73,7 +73,7 @@ for (const [name, routerModule] of routeModules) {
 }
 
 // Serve static uploads with long cache
-app.use('/uploads', express.static('uploads', {
+app.use(['/uploads', '/api/uploads'], express.static('uploads', {
   maxAge: '365d',
   immutable: true
 }));
