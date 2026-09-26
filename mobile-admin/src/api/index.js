@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://lolishop-manage.onrender.com/api';
+const API_BASE_URL = 'https://onlinestore-api-hju3.onrender.com/api';
 const ADMIN_KEY_STORAGE = 'admin_api_key';
 
 export const api = axios.create({

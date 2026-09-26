@@ -2,7 +2,7 @@
  * sync-order-remote.js
  * Syncs the product order from WuiltStore to the current site using the Admin API.
  */
-const API_BASE = process.env.API_BASE || 'https://lolishop-manage.onrender.com/api';
+const API_BASE = process.env.API_BASE || 'https://onlinestore-api-hju3.onrender.com/api';
 const ADMIN_KEY = process.env.ADMIN_API_KEY || ''; // Pass this via env or hardcode if safe
 
 const CRAWL_DATA = {

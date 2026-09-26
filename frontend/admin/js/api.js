@@ -36,7 +36,13 @@
 })();
 
 window.API_BASE = 'API_URL_PLACEHOLDER';
-const API_BASE = window.API_BASE;
+const getNormalizedApiBase = () => {
+  const raw = window.API_BASE || 'API_URL_PLACEHOLDER';
+  if (!raw || raw === 'API_URL_PLACEHOLDER') return raw;
+  const clean = raw.trim().replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+const API_BASE = getNormalizedApiBase();
 
 // v1.1.0 - Added seedShipping
 const api = {
@@ -64,8 +70,10 @@ const api = {
       path += (path.includes('?') ? '&' : '?') + 'adminKey=' + encodeURIComponent(currentKey);
     }
     
+    const base = getNormalizedApiBase();
     try {
-      const res = await fetch(`${API_BASE}${path}`, { ...opts, headers, signal: controller.signal });
+      const fullUrl = `${base}${path}`.replace('/api/api/', '/api/');
+      const res = await fetch(fullUrl, { ...opts, headers, signal: controller.signal });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 401 && path.includes('/employees/me')) {

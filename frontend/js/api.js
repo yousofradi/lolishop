@@ -1,6 +1,14 @@
 // ── Immediate Branding Removed (Static Branding applied) ──────────
-const API_BASE = 'API_URL_PLACEHOLDER';
-
+const RAW_API_BASE = 'API_URL_PLACEHOLDER';
+const getNormalizedApiBase = () => {
+  const raw = (typeof window !== 'undefined' && window.API_BASE && window.API_BASE !== 'API_URL_PLACEHOLDER')
+    ? window.API_BASE
+    : RAW_API_BASE;
+  if (!raw || raw === 'API_URL_PLACEHOLDER') return raw;
+  const clean = raw.trim().replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+const API_BASE = getNormalizedApiBase();
 
 const api = {
   _adminKey() { return localStorage.getItem('adminKey') || ''; },
@@ -36,7 +44,9 @@ const api = {
         path += (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
       }
 
-      const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+      const base = getNormalizedApiBase();
+      const fullUrl = `${base}${path}`.replace('/api/api/', '/api/');
+      const res = await fetch(fullUrl, { ...opts, headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 

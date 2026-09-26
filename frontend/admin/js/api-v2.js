@@ -36,7 +36,13 @@
 })();
 
 window.API_BASE = 'API_URL_PLACEHOLDER';
-const API_BASE = window.API_BASE;
+const getNormalizedApiBase = () => {
+  const raw = window.API_BASE || 'API_URL_PLACEHOLDER';
+  if (!raw || raw === 'API_URL_PLACEHOLDER') return raw;
+  const clean = raw.trim().replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+const API_BASE = getNormalizedApiBase();
 
 // v1.1.0 - Added seedShipping
 const api = {
@@ -70,13 +76,15 @@ const api = {
       finalPath += `${separator}_t=${Date.now()}`;
     }
 
-    if (API_BASE === 'API_URL' + '_PLACEHOLDER') {
+    const base = getNormalizedApiBase();
+    if (base === 'API_URL' + '_PLACEHOLDER') {
       if (id) clearTimeout(id);
-      console.error(`CRITICAL: API URL is not configured (Value: ${API_BASE})`);
+      console.error(`CRITICAL: API URL is not configured (Value: ${base})`);
       throw new Error('خطأ في تهيئة الاتصال بالخادم. يرجى مراجعة الإعدادات.');
     }
     try {
-      const res = await fetch(`${API_BASE}${finalPath}`, { ...opts, headers, signal: controller.signal });
+      const fullUrl = `${base}${finalPath}`.replace('/api/api/', '/api/');
+      const res = await fetch(fullUrl, { ...opts, headers, signal: controller.signal });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 401 && finalPath.includes('/employees/me')) {

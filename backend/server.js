@@ -47,23 +47,30 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 
-// ── Routes ──────────────────────────────────────────────
-app.use('/api/products', require('./routes/products'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/shipping', require('./routes/shipping'));
-app.use('/api/collections', require('./routes/collectionRoutes').router);
-app.use('/api/webhooks', require('./routes/webhookRoutes'));
-app.use('/api/settings', require('./routes/settings'));
-app.use('/api/seed', require('./routes/seed'));
-app.use('/api/upload', require('./routes/upload'));
-app.use('/api/customers', require('./routes/customerRoutes'));
-app.use('/api/promotions', require('./routes/promotions').router);
-app.use('/api/gift-collections', require('./routes/giftCollections'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/abandoned-carts', require('./routes/abandonedCarts'));
-app.use('/api/visitors', require('./routes/visitors'));
-app.use('/api/stats', require('./routes/stats'));
-app.use('/api/employees', require('./routes/employees'));
+// ── Routes (mount under both /api/... and /... for backward compatibility) ──────────────
+const routeModules = [
+  ['products', require('./routes/products')],
+  ['orders', require('./routes/orders')],
+  ['shipping', require('./routes/shipping')],
+  ['collections', require('./routes/collectionRoutes').router],
+  ['webhooks', require('./routes/webhookRoutes')],
+  ['settings', require('./routes/settings')],
+  ['seed', require('./routes/seed')],
+  ['upload', require('./routes/upload')],
+  ['customers', require('./routes/customerRoutes')],
+  ['promotions', require('./routes/promotions').router],
+  ['gift-collections', require('./routes/giftCollections')],
+  ['notifications', require('./routes/notifications')],
+  ['abandoned-carts', require('./routes/abandonedCarts')],
+  ['visitors', require('./routes/visitors')],
+  ['stats', require('./routes/stats')],
+  ['employees', require('./routes/employees')]
+];
+
+for (const [name, routerModule] of routeModules) {
+  app.use(`/api/${name}`, routerModule);
+  app.use(`/${name}`, routerModule);
+}
 
 // Serve static uploads with long cache
 app.use('/uploads', express.static('uploads', {
@@ -86,7 +93,7 @@ app.get('/', (req, res) => {
 });
 
 // ── Health check ────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

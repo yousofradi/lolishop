@@ -69,9 +69,11 @@ router.get('/:key', async (req, res) => {
     }
 
     let setting = await Setting.findOne({ key });
-    if (!setting && (key === 'loli_homepage_sections' || key === 'loli_global_settings')) {
-      const fallbackKey = key.replace('loli_', 'sundura_');
-      setting = await Setting.findOne({ key: fallbackKey });
+    if (!setting && (key === 'loli_homepage_sections' || key === 'sundura_homepage_sections')) {
+      setting = await Setting.findOne({ key: 'sundura_homepage_sections' });
+    }
+    if (!setting && (key === 'loli_global_settings' || key === 'sundura_global_settings')) {
+      setting = await Setting.findOne({ key: { $in: ['sundura_global_settings', 'admin_global_settings'] } });
     }
     const value = setting ? setting.value : null;
     
