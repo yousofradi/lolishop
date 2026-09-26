@@ -75,7 +75,12 @@ router.get('/:key', async (req, res) => {
     if (!setting && (key === 'loli_global_settings' || key === 'sundura_global_settings')) {
       setting = await Setting.findOne({ key: { $in: ['sundura_global_settings', 'admin_global_settings'] } });
     }
-    const value = setting ? setting.value : null;
+    let value = setting ? setting.value : null;
+    if (value && typeof value === 'object') {
+      if (typeof value.storeLogo === 'string' && (value.storeLogo.includes('sundura') || value.storeLogo.includes('wuiltstore') || value.storeLogo.includes('cmo1'))) {
+        value.storeLogo = '/assets/logo.webp';
+      }
+    }
     
     if (!bypassCache) {
       const ttl = (key === 'loli_homepage_sections' || key === 'sundura_homepage_sections') ? null : undefined;
@@ -89,9 +94,15 @@ router.get('/:key', async (req, res) => {
 
 router.post('/:key', adminAuth, async (req, res) => {
   try {
+    let saveVal = req.body.value;
+    if (saveVal && typeof saveVal === 'object' && typeof saveVal.storeLogo === 'string') {
+      if (saveVal.storeLogo.includes('sundura') || saveVal.storeLogo.includes('wuiltstore') || saveVal.storeLogo.includes('cmo1')) {
+        saveVal.storeLogo = '/assets/logo.webp';
+      }
+    }
     const setting = await Setting.findOneAndUpdate(
       { key: req.params.key },
-      { value: req.body.value },
+      { value: saveVal },
       { upsert: true, new: true }
     );
     

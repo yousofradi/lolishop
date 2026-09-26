@@ -2,7 +2,13 @@
 (function () {
   const cachedName = localStorage.getItem('admin_store_name');
   const cachedColor = localStorage.getItem('admin_primary_color');
-  const cachedLogo = localStorage.getItem('admin_store_logo');
+  let cachedLogo = localStorage.getItem('admin_store_logo') || localStorage.getItem('loli_store_logo');
+  if (cachedLogo && (cachedLogo.includes('sundura') || cachedLogo.includes('wuiltstore') || cachedLogo.includes('cmo1'))) {
+    localStorage.removeItem('admin_store_logo');
+    localStorage.removeItem('loli_store_logo');
+    localStorage.removeItem('sundura_store_logo');
+    cachedLogo = null;
+  }
   const cachedUrl = localStorage.getItem('admin_store_url');
 
 
@@ -21,11 +27,10 @@
       style.textContent = `.admin-nav a.active { background: ${cachedColor}15 !important; color: ${cachedColor} !important; } .admin-nav a.active svg { color: ${cachedColor} !important; }`;
       if (!document.getElementById('dynamic-primary-style')) document.head.appendChild(style);
     }
-    if (cachedLogo) {
-      document.querySelectorAll('.store-logo-img, img[src*="cmo1fsgmc060f01lwhwpn6ga7"]').forEach(img => img.src = cachedLogo || '/assets/logo.webp');
-      const loginLogo = document.getElementById('login-brand-logo');
-      if (loginLogo) loginLogo.innerHTML = `<img src="${cachedLogo || '/assets/logo.webp'}" style="max-height:100%; max-width:150px; display:block; margin:0 auto;">`;
-    }
+    const activeLogo = cachedLogo || '/assets/logo.webp';
+    document.querySelectorAll('.store-logo-img').forEach(img => img.src = activeLogo);
+    const loginLogo = document.getElementById('login-brand-logo');
+    if (loginLogo) loginLogo.innerHTML = `<img src="${activeLogo}" style="max-height:100%; max-width:150px; display:block; margin:0 auto;">`;
     if (cachedUrl) {
       document.querySelectorAll('.admin-store-preview').forEach(a => a.href = cachedUrl);
     }
@@ -37,8 +42,10 @@
 
 window.API_BASE = 'API_URL_PLACEHOLDER';
 const getNormalizedApiBase = () => {
-  const raw = window.API_BASE || 'API_URL_PLACEHOLDER';
-  if (!raw || raw === 'API_URL_PLACEHOLDER') return raw;
+  let raw = window.API_BASE || 'API_URL_PLACEHOLDER';
+  if (!raw || raw.includes('API_URL_PLACEHOLDER')) {
+    raw = 'https://onlinestore-api-hju3.onrender.com/api';
+  }
   const clean = raw.trim().replace(/\/+$/, '');
   return clean.endsWith('/api') ? clean : `${clean}/api`;
 };
@@ -507,8 +514,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settings) {
       // 1. Logo
       if (settings.storeLogo) {
+        if (settings.storeLogo.includes('sundura') || settings.storeLogo.includes('wuiltstore') || settings.storeLogo.includes('cmo1')) {
+          settings.storeLogo = '/assets/logo.webp';
+        }
         localStorage.setItem('loli_store_logo', settings.storeLogo);
-        document.querySelectorAll('.store-logo-img, img[src*="cmo1fsgmc060f01lwhwpn6ga7"]').forEach(img => {
+        document.querySelectorAll('.store-logo-img').forEach(img => {
           img.src = settings.storeLogo;
           img.style.opacity = '1';
         });

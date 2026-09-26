@@ -1,10 +1,12 @@
 // ── Immediate Branding Removed (Static Branding applied) ──────────
 const RAW_API_BASE = 'API_URL_PLACEHOLDER';
 const getNormalizedApiBase = () => {
-  const raw = (typeof window !== 'undefined' && window.API_BASE && window.API_BASE !== 'API_URL_PLACEHOLDER')
+  let raw = (typeof window !== 'undefined' && window.API_BASE && window.API_BASE !== 'API_URL_PLACEHOLDER')
     ? window.API_BASE
     : RAW_API_BASE;
-  if (!raw || raw === 'API_URL_PLACEHOLDER') return raw;
+  if (!raw || raw.includes('API_URL_PLACEHOLDER')) {
+    raw = 'https://onlinestore-api-hju3.onrender.com/api';
+  }
   const clean = raw.trim().replace(/\/+$/, '');
   return clean.endsWith('/api') ? clean : `${clean}/api`;
 };
