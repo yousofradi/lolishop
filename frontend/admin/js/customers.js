@@ -11,7 +11,7 @@ async function loadCustomers() {
   try {
     const [custRes, settingsRes] = await Promise.all([
       api.getCustomers(),
-      api.getSetting('sundura_global_settings').catch(() => ({}))
+      api.getSetting('loli_global_settings').catch(() => ({}))
     ]);
     allCustomers = custRes;
     window._globalSettings = settingsRes || {};

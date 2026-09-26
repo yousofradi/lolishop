@@ -30,7 +30,7 @@ if (isR2Configured) {
  * @param {string} prefix - Optional custom prefix for the filename (e.g., product name).
  * @returns {Promise<string>} - The public URL of the uploaded image.
  */
-async function uploadToR2(fileBuffer, originalName, folder = 'sundurashop', prefix = '') {
+async function uploadToR2(fileBuffer, originalName, folder = 'lolishop', prefix = '') {
   if (!isR2Configured || !s3Client) {
     throw new Error('Cloudflare R2 is not configured in Environment Variables.');
   }

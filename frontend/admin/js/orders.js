@@ -31,7 +31,7 @@ async function loadOrders() {
     
     const [ordersRes, globalSettings, adminSettings] = await Promise.all([
       api.getOrders(showingArchived, currentPage, currentLimit, currentFilter, query),
-      api.getSetting('sundura_global_settings').catch(() => null),
+      api.getSetting('loli_global_settings').catch(() => null),
       api.getSetting('admin_global_settings').catch(() => null)
     ]);
     
@@ -48,7 +48,7 @@ async function loadOrders() {
       updateFilterCounts(allOrdersData.length);
     }
     
-    // Webhook uses sundura_global_settings for paymentMethods and paymentNotes
+    // Webhook uses loli_global_settings for paymentMethods and paymentNotes
     if (globalSettings) {
       paymentMethodsCache = globalSettings.paymentMethods || [];
       paymentNotesCache = globalSettings.paymentNotes || '';

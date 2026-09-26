@@ -1,4 +1,4 @@
-const SETTINGS_KEY = 'sundura_global_settings';
+const SETTINGS_KEY = 'loli_global_settings';
 let originalSettings = null;
 let paymentMethods = [];
 

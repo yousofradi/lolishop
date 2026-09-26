@@ -8,10 +8,10 @@
 
   const apply = () => {
     if (cachedName || true) { // Always execute
-      document.querySelectorAll('.store-name-text').forEach(el => el.textContent = 'SunduraShop');
+      document.querySelectorAll('.store-name-text').forEach(el => el.textContent = 'LoliShop');
       if (document.title.includes('—')) {
         const parts = document.title.split('—');
-        document.title = parts[0].trim() + ' — SunduraShop';
+        document.title = parts[0].trim() + ' — LoliShop';
       }
     }
     if (cachedColor) {
@@ -548,11 +548,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Settings Loader ──────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const settings = await api.getSetting('sundura_global_settings');
+    const settings = await api.getSetting('loli_global_settings');
     if (settings) {
       // 1. Logo
       if (settings.storeLogo) {
-        localStorage.setItem('sundura_store_logo', settings.storeLogo);
+        localStorage.setItem('loli_store_logo', settings.storeLogo);
         document.querySelectorAll('.store-logo-img, img[src*="cmo1fsgmc060f01lwhwpn6ga7"]').forEach(img => {
           img.src = settings.storeLogo;
           img.style.opacity = '1';
@@ -565,10 +565,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // 1.1 Store URL & Name Caching
-      if (settings.storeUrl) localStorage.setItem('sundura_store_url', settings.storeUrl);
+      if (settings.storeUrl) localStorage.setItem('loli_store_url', settings.storeUrl);
       if (settings.storeName) {
-        localStorage.setItem('sundura_store_name', settings.storeName);
-        document.querySelectorAll('.store-name-text').forEach(el => el.textContent = 'SunduraShop');
+        localStorage.setItem('loli_store_name', settings.storeName);
+        document.querySelectorAll('.store-name-text').forEach(el => el.textContent = 'LoliShop');
       }
 
       if (settings.storeUrl) {
@@ -596,22 +596,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         for (const sep of separators) {
           if (document.title.includes(sep)) {
             const parts = document.title.split(sep);
-            document.title = parts[0].trim() + ' ' + sep + ' SunduraShop';
+            document.title = parts[0].trim() + ' ' + sep + ' LoliShop';
             updated = true;
             break;
           }
         }
         if (!updated) {
-          document.title = 'SunduraShop';
+          document.title = 'LoliShop';
         }
 
         const adminBrand = document.querySelector('.admin-brand-title');
-        if (adminBrand) adminBrand.textContent = 'SunduraShop';
+        if (adminBrand) adminBrand.textContent = 'LoliShop';
 
         // Update any generic placeholders in the DOM
         document.querySelectorAll('.store-name-text').forEach(el => {
-          if (el.tagName === 'INPUT') el.value = 'SunduraShop';
-          else el.textContent = 'SunduraShop';
+          if (el.tagName === 'INPUT') el.value = 'LoliShop';
+          else el.textContent = 'LoliShop';
         });
 
         // 3.1 SEO Meta Tags
@@ -705,7 +705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 7. Custom Color Palette
       if (settings.primaryColor) {
-        localStorage.setItem('sundura_primary_color', settings.primaryColor);
+        localStorage.setItem('loli_primary_color', settings.primaryColor);
         applyColorPalette(settings.primaryColor);
       }
 

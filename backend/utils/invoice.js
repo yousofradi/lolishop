@@ -11,7 +11,7 @@ function num(val) {
 }
 
 async function generateInvoiceInnerHtml(order, settings, options = {}) {
-  const brandName = settings.storeNameAr || settings.storeName || 'سندورة';
+  const brandName = settings.storeNameAr || settings.storeName || 'لولي';
   const Product = require('../models/Product');
   const fs = require('fs');
   const path = require('path');

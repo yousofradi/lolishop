@@ -82,7 +82,7 @@ router.post('/', adminAuth, upload.single('image'), async (req, res) => {
     let filename = '';
 
     if (isR2Configured) {
-      const folder = req.body.folder || 'sundurashop';
+      const folder = req.body.folder || 'lolishop';
       const prefix = req.body.prefix || '';
       imageUrl = await uploadToR2(req.file.buffer, req.file.originalname, folder, prefix);
       filename = path.basename(imageUrl);
@@ -169,7 +169,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
     errors: []
   };
 
-  async function migrateUrl(url, folder = 'sundurashop', prefix = '') {
+  async function migrateUrl(url, folder = 'lolishop', prefix = '') {
     if (!url || typeof url !== 'string' || !url.trim()) return url;
     const cleanUrl = url.trim();
     if (isR2Url(cleanUrl)) {
@@ -224,7 +224,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
       if (Array.isArray(product.images) && product.images.length > 0) {
         const newImages = [];
         for (const img of product.images) {
-          const newUrl = await migrateUrl(img, 'sundurashop', product.name || 'product');
+          const newUrl = await migrateUrl(img, 'lolishop', product.name || 'product');
           if (newUrl !== img) updated = true;
           newImages.push(newUrl);
         }
@@ -234,7 +234,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
       if (Array.isArray(product.variants) && product.variants.length > 0) {
         for (const variant of product.variants) {
           if (variant.image) {
-            const newUrl = await migrateUrl(variant.image, 'sundurashop', `${product.name}-variant`);
+            const newUrl = await migrateUrl(variant.image, 'lolishop', `${product.name}-variant`);
             if (newUrl !== variant.image) {
               variant.image = newUrl;
               updated = true;
@@ -253,7 +253,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
     const collections = await Collection.find({});
     for (const collection of collections) {
       if (collection.image) {
-        const newUrl = await migrateUrl(collection.image, 'sundurashop', collection.name || 'collection');
+        const newUrl = await migrateUrl(collection.image, 'lolishop', collection.name || 'collection');
         if (newUrl !== collection.image) {
           collection.image = newUrl;
           await collection.save();
@@ -279,7 +279,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
     const settings = await Setting.find({});
     for (const setting of settings) {
       if (typeof setting.value === 'string' && (setting.value.startsWith('http') || setting.value.startsWith('/uploads'))) {
-        const newUrl = await migrateUrl(setting.value, 'sundurashop', setting.key);
+        const newUrl = await migrateUrl(setting.value, 'lolishop', setting.key);
         if (newUrl !== setting.value) {
           setting.value = newUrl;
           await setting.save();
@@ -293,7 +293,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
       const promotions = await Promotion.find({});
       for (const promo of promotions) {
         if (promo.image) {
-          const newUrl = await migrateUrl(promo.image, 'sundurashop', promo.title || 'promo');
+          const newUrl = await migrateUrl(promo.image, 'lolishop', promo.title || 'promo');
           if (newUrl !== promo.image) {
             promo.image = newUrl;
             await promo.save();
@@ -308,7 +308,7 @@ router.all('/migrate-to-r2', adminAuth, async (req, res) => {
       const giftCollections = await GiftCollection.find({});
       for (const gc of giftCollections) {
         if (gc.image) {
-          const newUrl = await migrateUrl(gc.image, 'sundurashop', gc.title || 'gift');
+          const newUrl = await migrateUrl(gc.image, 'lolishop', gc.title || 'gift');
           if (newUrl !== gc.image) {
             gc.image = newUrl;
             await gc.save();

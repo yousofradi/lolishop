@@ -16,7 +16,7 @@ router.get('/test', (req, res) => res.json({ message: 'Seed route is active' }))
 router.post('/collections', adminAuth, async (req, res) => {
   try {
     const collectionsData = [
-      { name: 'سكوب سندورة', imageUrl: 'https://assets.wuiltstore.com/cmo0fglem05nc01lzdnl9fvh8_scope.webp' },
+      { name: 'سكوب لولي', imageUrl: 'https://assets.wuiltstore.com/cmo0fglem05nc01lzdnl9fvh8_scope.webp' },
       { name: 'ألعاب', imageUrl: 'https://assets.wuiltstore.com/cmo0gt4x805sk01n0exmd9zpl_Games.webp' },
       { name: 'أدوات فنية / تلوين', imageUrl: 'https://assets.wuiltstore.com/cmo0ghhw505rb01lw53u64q3m_Paint.webp' },
       { name: 'استيكرات', imageUrl: 'https://assets.wuiltstore.com/cmo0gm31705l401l7gsye6xl0_stickers.webp' },
@@ -529,7 +529,7 @@ router.get('/migrate-cloudinary', async (req, res) => {
     }
 
     // 3. Migrate Global Settings (Logo, Favicon, Preview)
-    const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+    const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
     if (globalSettings && globalSettings.value) {
       let settingsChanged = false;
       const settingsVal = { ...globalSettings.value };
@@ -604,7 +604,7 @@ router.get('/migrate-cloudinary', async (req, res) => {
         try {
           const redis = require('../utils/redis');
           if (redis && typeof redis.del === 'function') {
-            await redis.del('setting:sundura_global_settings');
+            await redis.del('setting:loli_global_settings');
             console.log('Cleared settings Redis cache');
           }
         } catch (e) {

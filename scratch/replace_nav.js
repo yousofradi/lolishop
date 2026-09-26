@@ -8,7 +8,7 @@ const newSidebar = `
     <aside class="admin-sidebar">
       <div class="admin-brand-header">
         <div class="admin-brand-sub">متاجري <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
-        <div class="admin-brand-title">Sundura Shop</div>
+        <div class="admin-brand-title">LoliShop</div>
         <a href="../" target="_blank" class="admin-store-preview">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
           معاينة المتجر

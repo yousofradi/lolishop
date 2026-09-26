@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [order, shipping, settings] = await Promise.all([
       api.getOrder(orderId),
       api.getShipping().catch(() => ({})),
-      api.getSetting('sundura_global_settings').catch(() => ({}))
+      api.getSetting('loli_global_settings').catch(() => ({}))
     ]);
 
     currentOrder = order;

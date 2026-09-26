@@ -561,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate WhatsApp link globally
   const waLink = document.getElementById('nav-wa-link');
   if (waLink) {
-    api.getSetting('sundura_global_settings').then(settings => {
+    api.getSetting('loli_global_settings').then(settings => {
       if (settings && settings.socialWa) {
         let waNumber = settings.socialWa.replace(/[^0-9]/g, '');
         if (waNumber.startsWith('01')) waNumber = '2' + waNumber;

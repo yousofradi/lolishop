@@ -37,7 +37,7 @@ router.post('/login', async (req, res) => {
     const cleanUsername = username.trim().toLowerCase();
     const envUsername = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
     const envPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const envApiKey = process.env.ADMIN_API_KEY || 'sundura_secret_admin_key';
+    const envApiKey = process.env.ADMIN_API_KEY || 'loli_secret_admin_key';
 
     // 1. Check Super Admin credentials (.env)
     if (cleanUsername === envUsername && password === envPassword) {

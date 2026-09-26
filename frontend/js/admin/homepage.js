@@ -1,5 +1,5 @@
 /** Homepage Builder — manages storefront sections */
-const STORAGE_KEY = 'sundura_homepage_sections';
+const STORAGE_KEY = 'loli_homepage_sections';
 let sections = [];
 let allCollections = [];
 let allProducts = [];

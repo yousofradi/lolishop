@@ -563,11 +563,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── PWA Initialization ──
   const initPWA = () => {
     // 1. Generate Dynamic Manifest with Store Logo
-    const storeLogo = localStorage.getItem('sundura_store_logo') || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
-    const storeName = localStorage.getItem('sundura_store_name') || 'Sundura Admin';
+    const storeLogo = localStorage.getItem('loli_store_logo') || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    const storeName = localStorage.getItem('loli_store_name') || 'LoliShop Admin';
 
     const manifest = {
-      "id": "sundura-admin-v1",
+      "id": "loli-admin-v1",
       "name": storeName,
       "short_name": storeName.split(' ')[0],
       "description": "Store Management Dashboard",

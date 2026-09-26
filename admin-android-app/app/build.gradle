@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.sundura.admin'
+    namespace 'com.lolishop.admin'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.sundura.admin"
+        applicationId "com.lolishop.admin"
         minSdk 24
         targetSdk 34
         versionCode 1

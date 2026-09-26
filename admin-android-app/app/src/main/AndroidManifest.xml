@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sundura.admin">
+    package="com.lolishop.admin">
 
     <!-- Required permissions to load the dashboard from the web -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -9,10 +9,10 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Sundura Admin"
+        android:label="LoliShop Admin"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SunduraAdmin"
+        android:theme="@style/Theme.LoliAdmin"
         android:usesCleartextTraffic="true">
         
         <activity

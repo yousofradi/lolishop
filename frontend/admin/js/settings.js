@@ -1,4 +1,4 @@
-const SETTINGS_KEY = 'sundura_global_settings';
+const SETTINGS_KEY = 'loli_global_settings';
 let originalSettings = null;
 let paymentMethods = [];
 
@@ -248,7 +248,7 @@ async function saveSettings() {
     
     // Immediately update preview links in the current page
     if (settings.storeUrl) {
-      localStorage.setItem('sundura_store_url', settings.storeUrl);
+      localStorage.setItem('loli_store_url', settings.storeUrl);
       document.querySelectorAll('.admin-store-preview').forEach(a => {
         a.href = settings.storeUrl;
       });

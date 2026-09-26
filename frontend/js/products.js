@@ -1,5 +1,5 @@
 /** Homepage — renders sections from homepage builder config */
-const STORAGE_KEY = 'sundura_homepage_sections';
+const STORAGE_KEY = 'loli_homepage_sections';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const content = document.getElementById('home-content');

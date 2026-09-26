@@ -1,4 +1,4 @@
-package com.sundura.admin;
+package com.lolishop.admin;
 
 import android.os.Bundle;
 import android.webkit.WebSettings;

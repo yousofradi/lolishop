@@ -22,7 +22,7 @@
             style="width: 24px; height: 24px; color: var(--text-muted);">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
           </svg></a>
-        <a href="/" class="store-logo-link"><img src="/assets/logo.webp" alt="SunduraShop Logo" class="store-logo-img"></a>
+        <a href="/" class="store-logo-link"><img src="/assets/logo.webp" alt="LoliShop Logo" class="store-logo-img"></a>
 
         <div class="header-icons">
           <button class="header-icon search-icon-btn" onclick="api.openSearch()">
@@ -107,7 +107,7 @@
   <script src="js/cart.js"></script>
   <script>
     async function copyNumber() {
-      const settings = await api.getSetting('sundura_global_settings');
+      const settings = await api.getSetting('loli_global_settings');
       const num = settings ? settings.socialWa : '';
       navigator.clipboard.writeText(num).then(() => {
         const modal = document.createElement('div');
@@ -187,7 +187,7 @@
         document.getElementById('summ-shipping').textContent = formatPrice(order.shippingFee);
         document.getElementById('summ-total').textContent = formatPrice(order.totalPrice);
 
-        const settings = await api.getSetting('sundura_global_settings');
+        const settings = await api.getSetting('loli_global_settings');
         let waNumber = (settings.socialWa || '').replace(/[^0-9]/g, '');
         if (waNumber.startsWith('01')) waNumber = '2' + waNumber;
         

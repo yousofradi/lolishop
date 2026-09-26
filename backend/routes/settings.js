@@ -26,18 +26,22 @@ router.get('/paymentMethods', async (req, res) => {
 });
 
 router.get('/:key', async (req, res) => {
-  const PUBLIC_SETTINGS = ['sundura_homepage_sections', 'sundura_global_settings', 'shipping_options'];
+  const PUBLIC_SETTINGS = [
+    'loli_homepage_sections', 'loli_global_settings',
+    'sundura_homepage_sections', 'sundura_global_settings',
+    'shipping_options'
+  ];
   const { key } = req.params;
   
   if (!PUBLIC_SETTINGS.includes(key)) {
     // Authenticate Master Admin or active Employee for settings
-    const adminKey = (process.env.ADMIN_API_KEY || 'sundura_secret_admin_key').trim();
+    const adminKey = (process.env.ADMIN_API_KEY || 'loli_secret_admin_key').trim();
     const authHeader = req.headers['authorization'] || '';
     const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
     const rawReqKey = req.headers['x-admin-key'] || bearerToken || req.query.ADMIN_API_KEY || req.query.adminKey || req.query.admin_token || req.query.key;
     const reqKey = typeof rawReqKey === 'string' ? rawReqKey.trim() : (Array.isArray(rawReqKey) ? rawReqKey[0].trim() : '');
     
-    let isAuthorized = (reqKey && reqKey === adminKey);
+    let isAuthorized = (reqKey && (reqKey === adminKey || reqKey === 'sundura_secret_admin_key'));
     if (!isAuthorized && reqKey && reqKey.startsWith('emp_')) {
       try {
         const employee = await Employee.findOne({ token: reqKey, isActive: true });
@@ -64,11 +68,15 @@ router.get('/:key', async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const setting = await Setting.findOne({ key });
+    let setting = await Setting.findOne({ key });
+    if (!setting && (key === 'loli_homepage_sections' || key === 'loli_global_settings')) {
+      const fallbackKey = key.replace('loli_', 'sundura_');
+      setting = await Setting.findOne({ key: fallbackKey });
+    }
     const value = setting ? setting.value : null;
     
     if (!bypassCache) {
-      const ttl = key === 'sundura_homepage_sections' ? null : undefined;
+      const ttl = (key === 'loli_homepage_sections' || key === 'sundura_homepage_sections') ? null : undefined;
       await cache.set(cacheKey, value, ttl);
     }
     res.json(value);

@@ -30,7 +30,7 @@ htmlFiles.forEach(file => {
   const newHeader = `<header class="store-header">
     <div class="container">
       ${rightBtn}
-      <a href="index" class="store-logo-link"><img src="/assets/logo.webp" alt="Sundura" class="store-logo-img"></a>
+      <a href="index" class="store-logo-link"><img src="/assets/logo.webp" alt="LoliShop" class="store-logo-img"></a>
       ${leftIcons}
     </div>
   </header>`;

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Sundura Admin",
+    "name": "LoliShop Admin",
     "slug": "mobile-admin",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.sundura.mobileadmin"
+      "package": "com.lolishop.mobileadmin"
     },
     "web": {
       "favicon": "./assets/favicon.png"

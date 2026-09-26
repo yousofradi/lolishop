@@ -268,7 +268,7 @@ async function processDriveUrlToStorage(url, prefix = 'product') {
       const response = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
       const buffer = Buffer.from(response.data);
 
-      return await uploadToR2(buffer, `drive-${fileId}.jpg`, 'sundurashop', prefix);
+      return await uploadToR2(buffer, `drive-${fileId}.jpg`, 'lolishop', prefix);
     } catch (err) {
       console.error('Failed to upload drive image to R2, falling back to Cloudinary:', err.message);
       return await uploadToCloudinary(url);

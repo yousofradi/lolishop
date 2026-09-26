@@ -26,7 +26,7 @@ export default function LoginScreen({ onLoginSuccess }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Sundura Admin</Text>
+        <Text style={styles.title}>LoliShop Admin</Text>
         <Text style={styles.subtitle}>Enter your secret admin key to continue</Text>
         
         <TextInput

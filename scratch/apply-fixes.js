@@ -5,7 +5,7 @@ const FRONTEND_DIR = 'c:/Users/YousofRady/.gemini/antigravity/scratch/ecommerce/
 
 const FAVICON_URL = 'https://res.cloudinary.com/sundura/image/upload/v1778758433/ecommerce-uploads/1778758432917-917399313.png';
 const OG_IMAGE_URL = 'https://res.cloudinary.com/sxvrwatl/image/upload/f_auto,q_85/v1783524407/ecommerce-uploads/1783524407085-724484340.webp';
-const STORE_URL = 'https://sundura.onrender.com';
+const STORE_URL = 'https://lolishop.onrender.com';
 
 const processFile = (filePath) => {
   let content = fs.readFileSync(filePath, 'utf8');

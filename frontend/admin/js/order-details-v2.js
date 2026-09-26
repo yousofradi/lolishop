@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const [order, settings, shippingOptions] = await Promise.all([
       api.getOrder(orderId),
-      api.getSetting('sundura_global_settings').catch(() => ({})),
+      api.getSetting('loli_global_settings').catch(() => ({})),
       api.getSetting('shipping_options').catch(() => [])
     ]);
 

@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const [settings, shippingOptionsRes, collectionsRes] = await Promise.all([
-      api.getSetting('sundura_global_settings').catch(() => ({})),
+      api.getSetting('loli_global_settings').catch(() => ({})),
       api.getSetting('shipping_options').catch(() => []),
       api.getCollections().catch(() => [])
     ]);

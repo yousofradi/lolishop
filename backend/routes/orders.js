@@ -295,7 +295,7 @@ router.get('/bulk/download-pdf', adminAuth, async (req, res) => {
   try {
     const orders = await Order.find({ archived: { $ne: true }, status: { $ne: 'cancelled' }, paidAmount: { $gt: 0 } }).sort({ createdAt: 1 });
     const Setting = require('../models/Setting');
-    const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+    const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
     const settings = globalSettings ? globalSettings.value : {};
 
     let pagesHtml = '';
@@ -423,7 +423,7 @@ router.get('/bulk/invoice-html', adminAuth, async (req, res) => {
   try {
     const orders = await Order.find({ archived: { $ne: true }, status: { $ne: 'cancelled' }, paidAmount: { $gt: 0 } }).sort({ createdAt: -1 });
     const Setting = require('../models/Setting');
-    const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+    const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
     const settings = globalSettings ? globalSettings.value : {};
 
     let pagesHtml = '';
@@ -532,7 +532,7 @@ router.get('/:orderId/download-image', adminAuth, async (req, res) => {
     if (!order) return res.status(404).send('Order not found');
 
     const Setting = require('../models/Setting');
-    const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+    const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
     const settings = globalSettings ? globalSettings.value : {};
 
     const innerHtml = await generateInvoiceInnerHtml(order, settings);
@@ -635,7 +635,7 @@ router.get('/:orderId/invoice', adminAuth, async (req, res) => {
     if (!order) return res.status(404).send('Order not found');
 
     const Setting = require('../models/Setting');
-    const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+    const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
     const settings = globalSettings ? globalSettings.value : {};
 
     const innerHtml = await generateInvoiceInnerHtml(order, settings);

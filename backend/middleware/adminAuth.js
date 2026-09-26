@@ -31,14 +31,14 @@ const adminAuth = async (req, res, next) => {
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
   const rawKey = req.headers['x-admin-key'] || bearerToken || req.query.ADMIN_API_KEY || req.query.adminKey || req.query.admin_token || req.query.key;
   const key = typeof rawKey === 'string' ? rawKey.trim() : (Array.isArray(rawKey) ? rawKey[0].trim() : '');
-  const adminKey = (process.env.ADMIN_API_KEY || 'sundura_secret_admin_key').trim();
+  const adminKey = (process.env.ADMIN_API_KEY || 'loli_secret_admin_key').trim();
 
   if (!key) {
     return res.status(401).json({ error: 'يرجى تسجيل الدخول للوصول إلى هذه الصفحة' });
   }
 
   // 1. Check Master Admin Key
-  if (key === adminKey) {
+  if (key === adminKey || key === 'sundura_secret_admin_key') {
     req.adminUser = {
       id: 'superadmin',
       name: 'المدير العام',

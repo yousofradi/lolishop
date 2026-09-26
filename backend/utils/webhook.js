@@ -63,7 +63,7 @@ async function sendWebhookInner(event, data, options = {}) {
         const { generateInvoiceInnerHtml } = require('./invoice');
 
         const waConfigSetting = await Setting.findOne({ key: 'whatsapp_configs' });
-        const globalSettings = await Setting.findOne({ key: 'sundura_global_settings' });
+        const globalSettings = await Setting.findOne({ key: 'loli_global_settings' });
         const settings = globalSettings ? globalSettings.value : {};
         const brandName = settings.storeNameAr || settings.storeName || 'متجرنا';
 
@@ -293,10 +293,11 @@ ${remainingText}
           let cleanCustomerPhone = formatWaNumber(data.customer?.phone);
           const whatsappLink = `https://api.whatsapp.com/send?phone=${cleanCustomerPhone}&text=${encodeURIComponent(customerMessage)}`;
 
-          // Shorten the Link using Sundura API
+          // Shorten the Link using URL shortener
           let shortLink = whatsappLink;
           try {
-            const shortenRes = await fetch('https://url.sundura.workers.dev/api/shorten', {
+            const shortenerUrl = process.env.URL_SHORTENER_URL || 'https://url.sundura.workers.dev/api/shorten';
+            const shortenRes = await fetch(shortenerUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ url: whatsappLink }),
@@ -309,7 +310,7 @@ ${remainingText}
               }
             }
           } catch (error) {
-            console.warn('[WhatsApp] Sundura link shortening failed:', error.message);
+            console.warn('[WhatsApp] Link shortening failed:', error.message);
           }
 
           // Filter customer configs

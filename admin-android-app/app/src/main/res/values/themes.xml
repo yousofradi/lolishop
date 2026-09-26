@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.SunduraAdmin" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.LoliAdmin" parent="Theme.AppCompat.Light.NoActionBar">
         <!-- Customize your light theme here. -->
         <item name="colorPrimary">#1e293b</item>
         <item name="colorPrimaryDark">#0f172a</item>

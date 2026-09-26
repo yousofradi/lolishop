@@ -99,7 +99,7 @@
       try {
         [currentOrder, storeSettings] = await Promise.all([
           api.getPublicOrder(orderId),
-          api.getSetting('sundura_global_settings')
+          api.getSetting('loli_global_settings')
         ]);
 
         if (!currentOrder) { window.location.href = 'index'; return; }
