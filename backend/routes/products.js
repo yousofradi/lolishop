@@ -643,19 +643,23 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
     }));
 
     for await (const row of stream) {
-      const title = row['title'] ? row['title'].trim() : '';
+      const title = (row['title'] || row['name'] || '').trim();
       
       // 1. Detect New Product
       if (title) {
+        const rawPrice = row['p-price'] || row['regular price'] || row['price'] || '';
+        const rawSalePrice = row['p-sale-price'] || row['sale price'] || '';
+        const rawQty = (row['quantity'] || row['qty'] || '').trim();
+
         currentProduct = {
           name: title,
-          description: row['description'] || '',
-          basePrice: cleanPrice(row['p-price']),
-          salePrice: row['p-sale-price'] ? cleanPrice(row['p-sale-price']) : null,
+          description: row['description'] || row['body (html)'] || '',
+          basePrice: cleanPrice(rawPrice),
+          salePrice: rawSalePrice ? cleanPrice(rawSalePrice) : null,
           imageUrl: '',
           images: [],
-          status: (row['status'] || 'active').toLowerCase(),
-          quantity: (row['quantity'] === 'Available' || !row['quantity']) ? null : (parseInt(row['quantity']) || 0),
+          status: ((row['status'] || 'active').trim().toLowerCase() === 'draft') ? 'draft' : 'active',
+          quantity: (rawQty === 'Available' || !rawQty) ? null : (parseInt(rawQty) || 0),
           collectionIds: [],
           options: [],
           variants: []
@@ -720,14 +724,17 @@ router.post('/import', adminAuth, upload.single('file'), async (req, res) => {
 
         // Only add to variants if it's a variable product row
         if (hasVariantInfo) {
-          const variantPrice = cleanPrice(row['p-price']);
-          const variantSalePrice = row['p-sale-price'] ? cleanPrice(row['p-sale-price']) : null;
+          const rawVarPrice = row['p-price'] || row['regular price'] || row['price'] || '';
+          const rawVarSale = row['p-sale-price'] || row['sale price'] || '';
+          const rawVarQty = (row['quantity'] || row['qty'] || '').trim();
+          const variantPrice = cleanPrice(rawVarPrice);
+          const variantSalePrice = rawVarSale ? cleanPrice(rawVarSale) : null;
           
           const variantData = {
             combination,
             price: variantPrice || currentProduct.basePrice,
             salePrice: variantSalePrice !== null ? variantSalePrice : currentProduct.salePrice,
-            quantity: (row['quantity'] === 'Available' || !row['quantity']) ? null : (parseInt(row['quantity']) || 0),
+            quantity: (rawVarQty === 'Available' || !rawVarQty) ? null : (parseInt(rawVarQty) || 0),
             active: true,
             imageUrl: ''
           };
