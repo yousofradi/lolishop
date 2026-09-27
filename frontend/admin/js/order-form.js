@@ -48,30 +48,29 @@ function resolveShippingDetails(cityName, forcedCarrier) {
     return norm(a) === norm(b);
   };
 
-  let carrier = forcedCarrier || 'egyptpost';
-  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
-    ? window._fullShippingData
-    : FALLBACK_EGYPT_GOVERNORATES;
-
-  let govData = shippingList.find(s =>
-    isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
-  );
+  const carrier = forcedCarrier || (window._shippingOptions && window._shippingOptions[0] ? window._shippingOptions[0].name : '');
+  const selectedOption = (window._shippingOptions || []).find(o => o.name === carrier) || (window._shippingOptions || [])[0];
 
   let fee = 0;
-  if (!window._shippingOptions || window._shippingOptions.length === 0) {
-    fee = govData ? (govData.fee || 85) : 85;
-  } else {
-    const selectedOption = window._shippingOptions.find(o => getCarrierInternalValue(o.name) === carrier) || window._shippingOptions[0];
-    if (!forcedCarrier && selectedOption) {
-      carrier = getCarrierInternalValue(selectedOption.name);
+  if (selectedOption) {
+    const cityObj = (selectedOption.cities || []).find(c => isCityEqual(c.city, cityName));
+    if (cityObj && cityObj.fee !== undefined && !isNaN(Number(cityObj.fee))) {
+      fee = Number(cityObj.fee);
+    } else if (selectedOption.cost !== undefined && !isNaN(Number(selectedOption.cost))) {
+      fee = Number(selectedOption.cost);
     }
-    const cityObj = selectedOption ? (selectedOption.cities || []).find(c =>
-      isCityEqual(c.city, cityName)
-    ) : null;
-    fee = cityObj ? Number(cityObj.fee) : (selectedOption ? Number(selectedOption.cost || 85) : 85);
   }
 
-  return { fee, carrier };
+  if (!fee && Array.isArray(window._fullShippingData) && window._fullShippingData.length > 0) {
+    const govData = window._fullShippingData.find(s => 
+      isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
+    );
+    if (govData && govData.fee !== undefined && !isNaN(Number(govData.fee))) {
+      fee = Number(govData.fee);
+    }
+  }
+
+  return { fee, carrier: selectedOption ? selectedOption.name : (carrier || '') };
 }
 
 function renderPaymentMethods(globalSettings) {
@@ -158,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (Array.isArray(cachedShipping) && cachedShipping.length > 0) {
     window._fullShippingData = cachedShipping;
   } else {
-    window._fullShippingData = [...FALLBACK_EGYPT_GOVERNORATES];
+    window._fullShippingData = [];
   }
 
   // 1. Settings & shipping options (load cache first for zero lag)
@@ -294,9 +293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderGovDropdown() {
       const query = (searchInput.value || '').trim();
-      const shippingList = (Array.isArray(window._fullShippingData) && window._fullShippingData.length > 0)
-        ? window._fullShippingData
-        : FALLBACK_EGYPT_GOVERNORATES;
+      const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
 
       const filtered = shippingList.filter(s =>
         smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
@@ -1016,9 +1013,7 @@ window.recalcSummary = function () {
   cartItems.forEach(c => subtotal += itemTotal(c));
   const cityId = document.getElementById('c-gov')?.value || '';
   const searchCityName = document.getElementById('c-gov-search')?.value.trim() || '';
-  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
-    ? window._fullShippingData
-    : FALLBACK_EGYPT_GOVERNORATES;
+  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
   const data = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = data ? (data.cityOtherName || data.city) : searchCityName;
 
@@ -1054,9 +1049,7 @@ window.submitOrder = async function () {
   const address = document.getElementById('c-address')?.value.trim() || '';
   const cityId = document.getElementById('c-gov')?.value || '';
 
-  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
-    ? window._fullShippingData
-    : FALLBACK_EGYPT_GOVERNORATES;
+  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
   const govData = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = govData ? (govData.cityOtherName || govData.city) : (document.getElementById('c-gov-search')?.value.trim() || '');
 
