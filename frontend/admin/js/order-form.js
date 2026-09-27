@@ -40,7 +40,7 @@ function getCarrierInternalValue(name) {
   return name;
 }
 
-function resolveShippingDetails(cityName, zoneName, forcedCarrier) {
+function resolveShippingDetails(cityName, forcedCarrier) {
   const isCityEqual = (a, b) => {
     if (!a || !b) return false;
     const norm = (s) => s.replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, '').toLowerCase().trim();
@@ -51,13 +51,6 @@ function resolveShippingDetails(cityName, zoneName, forcedCarrier) {
   let govData = (window._fullShippingData || []).find(s => 
     isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
   );
-
-  if (!forcedCarrier && zoneName && govData && govData.zones && govData.zones.length > 0) {
-    const selectedZoneObj = govData.zones.find(z => api.formatZoneName(z) === zoneName);
-    if (!selectedZoneObj || selectedZoneObj.bostaAvailable === false || selectedZoneObj.dropOffAvailability === false) {
-      carrier = 'egyptpost';
-    }
-  }
 
   let fee = 0;
   if (!window._shippingOptions || window._shippingOptions.length === 0) {
@@ -205,7 +198,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupSearch();
   setupCustomerSearch();
-  setupZoneSearch();
   updatePaymentUI();
 
   // ── Validation Listeners ──
@@ -865,25 +857,10 @@ function itemTotal(c) {
 }
 
 window.handleCityChange = async function() {
-  const zoneInput = document.getElementById('c-zone');
-  const zoneDropdown = document.getElementById('zone-dropdown');
-  if (zoneInput) zoneInput.value = '';
-  if (zoneDropdown) zoneDropdown.innerHTML = '';
-  window._currentCityZones = [];
-  window._currentCityZonesList = [];
-  
   window.handleCarrierChange();
 };
 
 window.handleCarrierChange = function() {
-  const zoneContainer = document.getElementById('c-zone-container');
-  const zoneInput = document.getElementById('c-zone');
-  if (zoneContainer) zoneContainer.style.display = 'none';
-  if (zoneInput) {
-    zoneInput.required = false;
-    zoneInput.value = '';
-  }
-  
   recalcSummary();
 };
 
@@ -894,10 +871,9 @@ window.recalcSummary = function () {
   const searchCityName = document.getElementById('c-gov-search')?.value.trim() || '';
   const data = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = data ? (data.cityOtherName || data.city) : searchCityName;
-  const zoneName = document.getElementById('c-zone')?.value || '';
 
   const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
-  const shipDetails = resolveShippingDetails(cityName, zoneName, carrierVal);
+  const shipDetails = resolveShippingDetails(cityName, carrierVal);
   const shipping = shipDetails.fee;
 
   const orderDiscount = parseFloat(document.getElementById('order-discount').value) || 0;
@@ -915,11 +891,10 @@ window.updatePaymentUI = function () {
 
 window.submitOrder = async function () {
   if (cartItems.length === 0) return showToast('أضف منتجاً واحداً على الأقل', 'error');
-  const name = document.getElementById('c-name').value.trim();
-  const phone = document.getElementById('c-phone').value.trim();
-  const address = document.getElementById('c-address').value.trim();
+  const name = document.getElementById('c-name')?.value.trim() || '';
+  const phone = document.getElementById('c-phone')?.value.trim() || '';
+  const address = document.getElementById('c-address')?.value.trim() || '';
   const cityId = document.getElementById('c-gov')?.value || '';
-  const zone = document.getElementById('c-zone')?.value || '';
   
   const govData = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = govData ? (govData.cityOtherName || govData.city) : (document.getElementById('c-gov-search')?.value.trim() || '');
@@ -937,7 +912,7 @@ window.submitOrder = async function () {
 
   // Resolve carrier first
   const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
-  const shipDetails = resolveShippingDetails(cityName, zone, carrierVal);
+  const shipDetails = resolveShippingDetails(cityName, carrierVal);
   const carrier = shipDetails.carrier;
   const shippingFee = shipDetails.fee;
 
@@ -978,11 +953,10 @@ window.submitOrder = async function () {
     customer: { 
       name, 
       phone, 
-      secondPhone: document.getElementById('c-second-phone').value.trim(), 
+      secondPhone: document.getElementById('c-second-phone')?.value.trim() || '', 
       address, 
       government: cityName, 
-      zone: zone,
-      notes: document.getElementById('c-notes').value.trim() 
+      notes: document.getElementById('c-notes')?.value.trim() || '' 
     },
     items: finalItems,
     discount: parseFloat(document.getElementById('order-discount').value) || 0,
@@ -1112,10 +1086,6 @@ function resetCustomerSelectionUI() {
       if (govEl) govEl.value = '';
       const govSearch = document.getElementById('c-gov-search');
       if (govSearch) govSearch.value = '';
-      const zoneEl = document.getElementById('c-zone');
-      if (zoneEl) zoneEl.value = '';
-      const zoneDropdown = document.getElementById('zone-dropdown');
-      if (zoneDropdown) zoneDropdown.innerHTML = '';
     }
 
     // Hide customer fields again in existing customer mode
@@ -1169,9 +1139,7 @@ window.selectCustomer = async function (phone) {
     searchInput.value = govData.cityOtherName || govData.city;
   }
 
-  await handleCityChange(); // Populates zones
-  const zoneEl = document.getElementById('c-zone');
-  if (zoneEl) zoneEl.value = customer.zone || '';
+  await handleCityChange();
   const addressEl = document.getElementById('c-address');
   if (addressEl) addressEl.value = customer.address || '';
   
@@ -1232,10 +1200,6 @@ window.toggleCustomerMode = function (autoExpand = true) {
     if (govEl) govEl.value = '';
     const govSearch = document.getElementById('c-gov-search');
     if (govSearch) govSearch.value = '';
-    const zoneEl = document.getElementById('c-zone');
-    if (zoneEl) zoneEl.value = '';
-    const zoneDropdown = document.getElementById('zone-dropdown');
-    if (zoneDropdown) zoneDropdown.innerHTML = '';
     const custSearch = document.getElementById('customer-search');
     if (custSearch) custSearch.value = '';
     
@@ -1287,66 +1251,6 @@ window.setupSearch = function () {
   input.addEventListener('input', (e) => {
     debouncedProductSearch(e.target.value.toLowerCase().trim());
   });
-};
-
-window.setupZoneSearch = function () {
-  const input = document.getElementById('c-zone');
-  const dropdown = document.getElementById('zone-dropdown');
-  if (!input || !dropdown) return;
-
-  input.addEventListener('focus', () => {
-    if (window._currentCityZones && window._currentCityZones.length > 0) {
-      renderZoneDropdown(window._currentCityZones);
-      dropdown.classList.add('active');
-    }
-  });
-
-  input.addEventListener('input', (e) => {
-    const q = e.target.value.trim();
-    if (!q) {
-      renderZoneDropdown(window._currentCityZones);
-      return;
-    }
-    
-    // Remove exact match short-circuit so we only show matched options
-    const filtered = (window._currentCityZones || []).filter(z => smartMatch(z, q));
-    
-    renderZoneDropdown(filtered);
-    dropdown.classList.add('active');
-  });
-
-  document.addEventListener('click', (e) => {
-    const container = document.getElementById('zone-search-container');
-    if (container && !container.contains(e.target) && !dropdown.contains(e.target)) {
-      dropdown.classList.remove('active');
-    }
-  });
-};
-
-function renderZoneDropdown(zones) {
-  const dropdown = document.getElementById('zone-dropdown');
-  if (!dropdown) return;
-
-  if (!zones || zones.length === 0) {
-    dropdown.innerHTML = '<div style="padding:16px; text-align:center; color:#64748b; font-size:0.9rem;">لا توجد مناطق</div>';
-    return;
-  }
-
-  dropdown.innerHTML = zones.map(z => `
-    <div class="customer-item" onclick="selectZone('${z}')">
-      <div style="font-weight:600; color:#1e293b; font-size:0.95rem;">${z}</div>
-    </div>
-  `).join('');
-}
-
-window.selectZone = function (name) {
-  const zoneEl = document.getElementById('c-zone');
-  if (zoneEl) zoneEl.value = name;
-  const zoneDropdown = document.getElementById('zone-dropdown');
-  if (zoneDropdown) zoneDropdown.classList.remove('active');
-  
-  recalcSummary();
-  if (window.markAsModified) window.markAsModified();
 };
 
 window.addToCart = function (id) {
