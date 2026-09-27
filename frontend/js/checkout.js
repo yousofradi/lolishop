@@ -266,51 +266,14 @@ function updatePriceSummary() {
   const cityName = govData ? (govData.cityOtherName || govData.city) : (searchInputVal || govInputVal);
 
   let shippingFee = 0;
-  const isEgyptPost = true;
-  window._selectedCarrier = 'egyptpost';
-
-  const DECLARED_GOV_FEES = {
-    'القاهرة': 85,
-    'الجيزة': 85,
-    'الإسكندرية': 85,
-    'الدقهلية': 85,
-    'البحيرة': 85,
-    'القليوبية': 85,
-    'الغربية': 85,
-    'المنوفية': 85,
-    'دمياط': 85,
-    'كفر الشيخ': 85,
-    'الشرقية': 85,
-    'الاسماعيلية': 95,
-    'الإسماعيلية': 95,
-    'السويس': 95,
-    'بورسعيد': 95,
-    'الفيوم': 115,
-    'بني سويف': 110,
-    'المنيا': 110,
-    'اسيوط': 110,
-    'أسيوط': 110,
-    'سوهاج': 130,
-    'قنا': 130,
-    'أسوان': 130,
-    'اسوان': 130,
-    'الأقصر': 130,
-    'الاقصر': 130,
-    'البحر الأحمر': 130,
-    'مرسي مطروح': 135,
-    'مرسى مطروح': 135,
-    'مطروح': 135,
-    'الوادي الجديد': 135,
-    'شمال سيناء': 135,
-    'جنوب سيناء': 135
-  };
+  let activeShippingOption = null;
+  if (Array.isArray(window._shippingOptions) && window._shippingOptions.length > 0) {
+    activeShippingOption = window._shippingOptions.find(o => o.active !== false) || window._shippingOptions[0];
+  }
+  window._selectedCarrier = (activeShippingOption && activeShippingOption.name) ? activeShippingOption.name : '';
 
   if (cityName) {
-    const postOption = (window._shippingOptions || []).find(o => 
-      o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-    ) || (window._shippingOptions || [])[0];
-    
-    const cityObj = postOption ? (postOption.cities || []).find(c => 
+    const cityObj = activeShippingOption ? (activeShippingOption.cities || []).find(c => 
       isCityEqual(c.city, cityName) || 
       (govData && (isCityEqual(c.city, govData.city) || isCityEqual(c.city, govData.cityOtherName)))
     ) : null;
@@ -319,22 +282,12 @@ function updatePriceSummary() {
       shippingFee = Number(cityObj.fee);
     } else if (govData && govData.fee !== undefined && !isNaN(Number(govData.fee))) {
       shippingFee = Number(govData.fee);
-    } else {
-      let matchedFee = null;
-      for (const [gov, fee] of Object.entries(DECLARED_GOV_FEES)) {
-        if (isCityEqual(gov, cityName) || (govData && (isCityEqual(gov, govData.city) || isCityEqual(gov, govData.cityOtherName)))) {
-          matchedFee = fee;
-          break;
-        }
-      }
-      shippingFee = matchedFee !== null ? matchedFee : (DECLARED_GOV_FEES[cityName] || 85);
+    } else if (activeShippingOption && activeShippingOption.cost !== undefined && !isNaN(Number(activeShippingOption.cost))) {
+      shippingFee = Number(activeShippingOption.cost);
     }
   } else {
     shippingFee = 0;
   }
-
-  // Update Shipping Notice
-  updateShippingMethodNotice(isEgyptPost);
 
   let totalDiscount = 0;
   if (window._cartPromotionData) {
@@ -386,7 +339,12 @@ function updatePriceSummary() {
     if (cityName || cityId) {
       shipEl.textContent = formatPrice(shippingFee);
       if (shipLabelEl) {
-        shipLabelEl.innerHTML = `الشحن <span style="color:#b84a20; font-size:0.85rem; font-weight:bold;">(البريد المصري)</span>`;
+        const carrierName = (activeShippingOption && activeShippingOption.name) ? activeShippingOption.name : (window._selectedCarrier || '');
+        if (carrierName && carrierName !== 'default' && carrierName !== 'egyptpost') {
+          shipLabelEl.innerHTML = `الشحن <span style="color:#b84a20; font-size:0.85rem; font-weight:bold;">(${carrierName})</span>`;
+        } else {
+          shipLabelEl.textContent = 'الشحن';
+        }
       }
     } else {
       shipEl.textContent = '—';
@@ -597,7 +555,7 @@ function setupForm() {
       },
       items,
       paymentMethod: payment.value,
-      carrier: 'egyptpost',
+      carrier: (activeShippingOption && activeShippingOption.name) ? activeShippingOption.name : (window._selectedCarrier || ''),
       shippingFee: window._currentShippingFee !== undefined ? window._currentShippingFee : 0
     };
 

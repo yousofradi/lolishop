@@ -418,7 +418,7 @@
           <div class="mb-24" style="display:flex; justify-content:space-between; align-items:flex-end;">
             <div>
               <h1 class="page-title">رسوم الشحن</h1>
-              <p class="page-subtitle">تحديد تكلفة الشحن لكل محافظة (البريد المصري)</p>
+              <p class="page-subtitle">تحديد تكلفة الشحن لكل محافظة والمناطق</p>
             </div>
             <div style="display:flex; gap:10px;">
               <button class="btn btn-secondary" onclick="seedShippingData()">Seed</button>
@@ -657,7 +657,7 @@
         if (!options || !Array.isArray(options) || options.length === 0) {
           options = [
             {
-              name: "البريد المصري",
+              name: "شحن عادي",
               cost: 65,
               cities: EGYPT_GOVERNORATES.map(gov => ({
                 city: gov,

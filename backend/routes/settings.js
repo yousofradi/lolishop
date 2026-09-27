@@ -117,9 +117,7 @@ router.post('/:key', adminAuth, async (req, res) => {
         const SHIPPING_CACHE_KEY = 'storefront:shipping:list';
         
         const options = req.body.value || [];
-        const postOption = options.find(o => 
-          o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-        ) || options[0];
+        const postOption = (options && options.length > 0) ? (options.find(o => o.active !== false) || options[0]) : null;
 
         if (postOption && Array.isArray(postOption.cities)) {
           const isCityEqual = (a, b) => {

@@ -337,7 +337,7 @@ ${productsHtml}
 ${discountRow}
 
 <div class="row">
-<span>مصاريف الشحن (${safe(order.carrier === 'egyptpost' ? 'البريد المصري' : 'بوسطة')} - ${safe(order.customer.government)})</span>
+<span>مصاريف الشحن (${safe((order.carrier && order.carrier !== 'egyptpost') ? `${order.carrier} - ` : '')}${safe(order.customer.government)})</span>
 <span>${shipping === 0 ? 'مجاني' : `${shipping} ج`}</span>
 </div>
 

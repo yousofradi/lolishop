@@ -15,9 +15,9 @@ async function refreshShippingCache() {
     const Setting = require('../models/Setting');
     const shippingOptionsRecord = await Setting.findOne({ key: 'shipping_options' });
     const shippingOptions = shippingOptionsRecord ? shippingOptionsRecord.value : [];
-    const postOption = shippingOptions.find(o => 
-      o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-    ) || shippingOptions[0];
+    const postOption = (shippingOptions && shippingOptions.length > 0)
+      ? (shippingOptions.find(o => o.active !== false) || shippingOptions[0])
+      : null;
 
     const isCityEqual = (a, b) => {
       if (!a || !b) return false;
@@ -83,9 +83,9 @@ router.get('/', async (req, res) => {
     const Setting = require('../models/Setting');
     const shippingOptionsRecord = await Setting.findOne({ key: 'shipping_options' });
     const shippingOptions = shippingOptionsRecord ? shippingOptionsRecord.value : [];
-    const postOption = shippingOptions.find(o => 
-      o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-    ) || shippingOptions[0];
+    const postOption = (shippingOptions && shippingOptions.length > 0)
+      ? (shippingOptions.find(o => o.active !== false) || shippingOptions[0])
+      : null;
 
     const isCityEqual = (a, b) => {
       if (!a || !b) return false;
@@ -150,9 +150,9 @@ router.get('/egyptpost', async (req, res) => {
     // 2. Resolve Egypt Post options
     const shippingOptionsRecord = await Setting.findOne({ key: 'shipping_options' });
     const shippingOptions = shippingOptionsRecord ? shippingOptionsRecord.value : [];
-    const postOption = shippingOptions.find(o => 
-      o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-    ) || shippingOptions[0];
+    const postOption = (shippingOptions && shippingOptions.length > 0)
+      ? (shippingOptions.find(o => o.active !== false) || shippingOptions[0])
+      : null;
 
     const isCityEqual = (a, b) => {
       if (!a || !b) return false;

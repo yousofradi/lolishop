@@ -35,9 +35,8 @@ let shippingMap = {};
 let cartItems = []; // [{ product, quantity, selectedOptions, discount }]
 
 function getCarrierInternalValue(name) {
-  if (!name) return 'egyptpost';
+  if (!name) return 'default';
   if (name.includes('بوسطة') || name.toLowerCase().includes('bosta')) return 'bosta';
-  if (name.includes('البريد') || name.toLowerCase().includes('post')) return 'egyptpost';
   return name;
 }
 
@@ -188,7 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let shippingOptionsRes = await api.getSetting('shipping_options').catch(() => []);
     if (!shippingOptionsRes || !Array.isArray(shippingOptionsRes) || shippingOptionsRes.length === 0) {
       shippingOptionsRes = [
-        { name: 'البريد المصري', cost: 85, active: true }
+        { name: 'شحن عادي', cost: 85, active: true }
       ];
     }
     window._shippingOptions = Array.isArray(shippingOptionsRes) ? shippingOptionsRes : [];

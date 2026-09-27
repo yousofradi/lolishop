@@ -7,9 +7,8 @@ let collectionsMap = {};
 let shippingMap = {};
 
 function getCarrierInternalValue(name) {
-  if (!name) return 'egyptpost';
+  if (!name) return 'default';
   if (name.includes('بوسطة') || name.toLowerCase().includes('bosta')) return 'bosta';
-  if (name.includes('البريد') || name.toLowerCase().includes('post')) return 'egyptpost';
   return name;
 }
 
@@ -20,7 +19,7 @@ function resolveShippingDetails(cityName, forcedCarrier) {
     return norm(a) === norm(b);
   };
 
-  let carrier = forcedCarrier || 'egyptpost';
+  let carrier = forcedCarrier || (window._shippingOptions && window._shippingOptions[0] ? window._shippingOptions[0].name : 'default');
   let govData = (window._fullShippingData || []).find(s =>
     isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
   );
@@ -210,8 +209,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Egypt Post orders cannot be shipped via Bosta
-    if (currentOrder.carrier === 'egyptpost') {
-      showToast('لا يمكن شحن طلبات البريد المصري عبر Bosta', 'error');
+    if (currentOrder.carrier !== 'bosta') {
+      showToast('لا يمكن شحن هذا الطلب عبر Bosta لأن شركة الشحن المحددة ليست بوسطة', 'error');
       return;
     }
 
@@ -351,9 +350,7 @@ function renderOrder() {
 
   const govEl = document.getElementById('view-c-gov');
   govEl.textContent = o.customer.government || 'لا يوجد محافظة';
-  if (o.carrier === 'egyptpost') {
-    govEl.innerHTML += ' <span class="badge badge-danger" style="background:#fee2e2; color:#dc2626; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; margin-right:8px; font-weight:700;">البريد المصري</span>';
-  } else if (o.carrier === 'bosta') {
+  if (o.carrier && o.carrier === 'bosta') {
     if (o.bostaTrackingNumber) {
       govEl.innerHTML += ` <span class="badge badge-success" style="background:#e0f2fe; color:#0369a1; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; margin-right:8px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
@@ -362,6 +359,9 @@ function renderOrder() {
     } else {
       govEl.innerHTML += ' <span class="badge badge-info" style="background:#f1f5f9; color:#475569; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; margin-right:8px; font-weight:700;">بوسطة (غير مشحون)</span>';
     }
+  } else if (o.carrier) {
+    const carrierDisplay = (o.carrier === 'egyptpost') ? 'شحن عادي' : o.carrier;
+    govEl.innerHTML += ` <span class="badge" style="background:#f1f5f9; color:#475569; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; margin-right:8px; font-weight:700;">${carrierDisplay}</span>`;
   }
 
   document.getElementById('view-payment-method').textContent =
