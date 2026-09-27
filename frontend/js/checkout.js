@@ -113,12 +113,15 @@ async function loadPaymentMethods() {
     container.innerHTML = methods.map((m, idx) => `
       <div class="radio-option">
         <input type="radio" name="payment" id="pay-${m.id}" value="${m.label}" ${idx === 0 ? 'checked' : ''}>
-        <label for="pay-${m.id}" style="justify-content: space-between; padding: 12px 16px; border-radius:12px; border-width:1.5px;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
-               ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'}
+        <label for="pay-${m.id}" style="justify-content: space-between; padding: 12px 16px; border-radius:12px; border-width:1.5px; align-items:center;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; background:#f8fafc; border-radius:8px;">
+               ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'}
             </div>
-            <span style="font-weight:700; font-size:0.9rem; color:var(--text-main);">${m.label}</span>
+            <div>
+              <span style="font-weight:700; font-size:0.9rem; color:var(--text-main); display:block;">${m.label}</span>
+              ${(m.accountHolder || m.recipientName) ? `<span style="font-size:0.78rem; color:#64748b; display:block; margin-top:2px;">المحول إليه: <strong style="color:#1e293b;">${m.accountHolder || m.recipientName}</strong></span>` : ''}
+            </div>
           </div>
           
           <div style="display:flex; align-items:center; gap:8px;">

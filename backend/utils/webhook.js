@@ -253,25 +253,17 @@ async function sendWebhookInner(event, data, options = {}) {
 
 شكراً لثقتك بنا ♡`;
             } else {
-              const selectedPaymentMethod = (settings.paymentMethods || []).find(m => m.label === data.paymentMethod);
-              const paymentNumber = selectedPaymentMethod ? selectedPaymentMethod.number : '';
-
-              const normPayment = `${data.paymentMethod || ''} ${selectedPaymentMethod?.label || ''} ${selectedPaymentMethod?.id || ''}`
-                .toLowerCase()
-                .replace(/[أإآ]/g, 'ا');
-
-              let accountHolder = '';
-              if (normPayment.includes('انستا') || normPayment.includes('insta')) {
-                accountHolder = 'دينا علي  (دينا ع** م*** ا****** ق**** )';
-              } else if (normPayment.includes('فودافون') || normPayment.includes('vodafone')) {
-                accountHolder = 'دينا علي محمد  \n(Dina A**  M******)';
-              }
+              const selectedPaymentMethod = (settings.paymentMethods || []).find(m => 
+                m && (m.label === data.paymentMethod || m.id === data.paymentMethod)
+              );
+              const paymentNumber = selectedPaymentMethod ? (selectedPaymentMethod.number || '') : '';
+              const accountHolder = selectedPaymentMethod ? (selectedPaymentMethod.accountHolder || selectedPaymentMethod.recipientName || '') : '';
 
               customerMessage = `مرحباً ${data.customer.name}
 
 رقم الطلب: ${data.orderId}
 إجمالي المبلغ: ${data.totalPrice} EGP
-طريقة الدفع: ${data.paymentMethod}${paymentNumber ? `\nرقم الدفع: ${paymentNumber}` : ''}${accountHolder ? `\nب اسم : ${accountHolder}` : ''}
+طريقة الدفع: ${data.paymentMethod}${paymentNumber ? `\nرقم الدفع: ${paymentNumber}` : ''}${accountHolder ? `\nاسم المحول إليه: ${accountHolder}` : ''}
 
 ${settings.paymentNotes || ''}
 

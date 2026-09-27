@@ -149,6 +149,7 @@ function addPaymentMethod() {
     id,
     label: '',
     number: '',
+    accountHolder: '',
     logo: ''
   });
   renderPaymentMethods();
@@ -207,12 +208,20 @@ function renderPaymentMethods() {
                 </button>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-              <div class="form-group mb-0">
-                  <input type="text" class="form-control" value="${m.label}" oninput="updatePaymentMethod('${m.id}', 'label', this.value)" placeholder="الاسم" style="font-weight:700; text-align:center; padding:8px; font-size:0.85rem;">
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <div class="form-group mb-0">
+                    <label class="form-label" style="font-size:0.75rem; margin-bottom:4px; color:#64748b;">اسم وسيلة الدفع</label>
+                    <input type="text" class="form-control" value="${m.label || ''}" oninput="updatePaymentMethod('${m.id}', 'label', this.value)" placeholder="مثال: فودافون كاش" style="font-weight:700; padding:8px; font-size:0.85rem;">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label" style="font-size:0.75rem; margin-bottom:4px; color:#64748b;">رقم التحويل</label>
+                    <input type="text" class="form-control" value="${m.number || ''}" oninput="updatePaymentMethod('${m.id}', 'number', this.value)" placeholder="010XXXXXXXX" style="font-family:monospace; font-size:0.85rem; padding:8px;">
+                </div>
               </div>
               <div class="form-group mb-0">
-                  <input type="text" class="form-control" value="${m.number}" oninput="updatePaymentMethod('${m.id}', 'number', this.value)" placeholder="الرقم" style="text-align:center; font-family:monospace; font-size:0.85rem; padding:8px;">
+                  <label class="form-label" style="font-size:0.75rem; margin-bottom:4px; color:#64748b;">اسم المحول إليه (صاحب الحساب/المحفظة)</label>
+                  <input type="text" class="form-control" value="${m.accountHolder || m.recipientName || ''}" oninput="updatePaymentMethod('${m.id}', 'accountHolder', this.value)" placeholder="مثال: اسم صاحب المحفظة / انستاباي" style="padding:8px; font-size:0.85rem;">
               </div>
             </div>
         </div>
