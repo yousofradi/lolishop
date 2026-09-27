@@ -1082,6 +1082,16 @@ router.put('/:orderId', adminAuth, async (req, res) => {
     const order = await Order.findOne(query);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
+    // Special action: Resend / Force trigger payment & created webhooks
+    if (updates.forcePaymentWebhook) {
+      const event = (order.paidAmount > 0) ? 'order.paid' : 'order.created';
+      console.log(`[Webhook] Force triggering webhooks and WhatsApp for ${event} - order ${order.orderId}`);
+      sendWebhook(event, order.toObject()).catch(err => {
+        console.error('[Webhook] Background trigger failed:', err.message);
+      });
+      return res.json(order);
+    }
+
     // 1. Concurrency Check (Optimistic Locking)
     if (updates.updatedAt) {
       const incomingTime = new Date(updates.updatedAt).getTime();

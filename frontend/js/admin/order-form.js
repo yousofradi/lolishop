@@ -20,10 +20,10 @@ function smartMatch(text, query) {
     .replace(/^ال/, '')
     .replace(/\sال/g, ' ')
     .trim();
-  
+
   const nText = normalize(text);
   const nQuery = normalize(query);
-  
+
   // Suggest if query matches any part of the text or vice versa
   return nText.includes(nQuery) || nQuery.includes(nText);
 }
@@ -34,6 +34,13 @@ let collectionsMap = {};
 let shippingMap = {};
 let cartItems = []; // [{ product, quantity, selectedOptions, discount }]
 
+function getCarrierInternalValue(name) {
+  if (!name) return 'egyptpost';
+  if (name.includes('بوسطة') || name.toLowerCase().includes('bosta')) return 'bosta';
+  if (name.includes('البريد') || name.toLowerCase().includes('post')) return 'egyptpost';
+  return name;
+}
+
 function resolveShippingDetails(cityName, forcedCarrier) {
   const isCityEqual = (a, b) => {
     if (!a || !b) return false;
@@ -41,29 +48,30 @@ function resolveShippingDetails(cityName, forcedCarrier) {
     return norm(a) === norm(b);
   };
 
-  const carrier = forcedCarrier || (window._shippingOptions && window._shippingOptions[0] ? window._shippingOptions[0].name : '');
-  const selectedOption = (window._shippingOptions || []).find(o => o.name === carrier) || (window._shippingOptions || [])[0];
+  let carrier = forcedCarrier || 'egyptpost';
+  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
+    ? window._fullShippingData
+    : FALLBACK_EGYPT_GOVERNORATES;
+
+  let govData = shippingList.find(s =>
+    isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
+  );
 
   let fee = 0;
-  if (selectedOption) {
-    const cityObj = (selectedOption.cities || []).find(c => isCityEqual(c.city, cityName));
-    if (cityObj && cityObj.fee !== undefined && !isNaN(Number(cityObj.fee))) {
-      fee = Number(cityObj.fee);
-    } else if (selectedOption.cost !== undefined && !isNaN(Number(selectedOption.cost))) {
-      fee = Number(selectedOption.cost);
+  if (!window._shippingOptions || window._shippingOptions.length === 0) {
+    fee = govData ? (govData.fee || 85) : 85;
+  } else {
+    const selectedOption = window._shippingOptions.find(o => getCarrierInternalValue(o.name) === carrier) || window._shippingOptions[0];
+    if (!forcedCarrier && selectedOption) {
+      carrier = getCarrierInternalValue(selectedOption.name);
     }
+    const cityObj = selectedOption ? (selectedOption.cities || []).find(c =>
+      isCityEqual(c.city, cityName)
+    ) : null;
+    fee = cityObj ? Number(cityObj.fee) : (selectedOption ? Number(selectedOption.cost || 85) : 85);
   }
 
-  if (!fee && Array.isArray(window._fullShippingData) && window._fullShippingData.length > 0) {
-    const govData = window._fullShippingData.find(s => 
-      isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
-    );
-    if (govData && govData.fee !== undefined && !isNaN(Number(govData.fee))) {
-      fee = Number(govData.fee);
-    }
-  }
-
-  return { fee, carrier: selectedOption ? selectedOption.name : (carrier || '') };
+  return { fee, carrier };
 }
 
 function renderPaymentMethods(globalSettings) {
@@ -94,14 +102,14 @@ function renderPaymentMethods(globalSettings) {
   methods.forEach((m) => {
     if (!m || !m.label) return;
     const isVodafone = m.label.includes('فودافون') || m.label.toLowerCase().includes('vodafone');
-    
+
     html += `
       <label class="payment-method-card" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin-bottom: 8px; border-radius: 12px; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 12px;">
           <input type="radio" name="payment" value="${m.label}" onchange="updatePaymentUI()" style="margin:0; width: 18px; height: 18px; accent-color: var(--primary);">
           <span class="payment-method-icon" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 8px; overflow: hidden; padding: 2px;">
             ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;" alt="${m.label}">` : (
-              isVodafone ? `
+        isVodafone ? `
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                   <line x1="12" y1="18" x2="12.01" y2="18"></line>
@@ -112,7 +120,7 @@ function renderPaymentMethods(globalSettings) {
                   <line x1="1" y1="10" x2="23" y2="10"></line>
                 </svg>
               `
-            )}
+      )}
           </span>
           <div style="text-align: right;">
             <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b;">${m.label}</div>
@@ -139,23 +147,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.body.classList.add('is-loading');
 
-  // Immediately initialize shipping data with cache if available
+  // Immediately initialize shipping data with cache or fallback so dropdown works instantly
   let cachedShipping = null;
   try {
     const raw = localStorage.getItem('cached_shipping_data');
     if (raw) cachedShipping = JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
 
-  window._fullShippingData = Array.isArray(cachedShipping) ? cachedShipping : [];
+  if (Array.isArray(cachedShipping) && cachedShipping.length > 0) {
+    window._fullShippingData = cachedShipping;
+  } else {
+    window._fullShippingData = [...FALLBACK_EGYPT_GOVERNORATES];
+  }
 
   // 1. Settings & shipping options (load cache first for zero lag)
   let globalSettings = {};
   try {
     const cachedSettings = localStorage.getItem('cached_global_settings');
     if (cachedSettings) {
-      try { globalSettings = JSON.parse(cachedSettings); } catch (e) {}
+      try { globalSettings = JSON.parse(cachedSettings); } catch (e) { }
     }
-  } catch (e) {}
+  } catch (e) { }
   window._globalSettings = globalSettings;
   renderPaymentMethods(globalSettings);
 
@@ -167,44 +179,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settings && typeof settings === 'object') {
       window._globalSettings = settings;
       renderPaymentMethods(settings);
-      try { localStorage.setItem('cached_global_settings', JSON.stringify(settings)); } catch (e) {}
+      try { localStorage.setItem('cached_global_settings', JSON.stringify(settings)); } catch (e) { }
     }
   }).catch((e) => console.warn('Error loading live settings:', e));
 
-  // Load shipping options directly from DB
+  // Load shipping options
   try {
     let shippingOptionsRes = await api.getSetting('shipping_options').catch(() => []);
+    if (!shippingOptionsRes || !Array.isArray(shippingOptionsRes) || shippingOptionsRes.length === 0) {
+      shippingOptionsRes = [
+        { name: 'البريد المصري', cost: 85, active: true }
+      ];
+    }
     window._shippingOptions = Array.isArray(shippingOptionsRes) ? shippingOptionsRes : [];
     const carrierSelect = document.getElementById('c-carrier');
-    if (carrierSelect) {
-      if (window._shippingOptions.length > 0) {
-        carrierSelect.innerHTML = window._shippingOptions.map(o => {
-          return `<option value="${o.name}">${o.name}</option>`;
-        }).join('');
-      } else {
-        carrierSelect.innerHTML = '<option value="">لا توجد خيارات شحن مسجلة</option>';
-      }
-    }
-
-    // Extract cities directly from DB shipping_options if full list not yet loaded
-    if (!window._fullShippingData || window._fullShippingData.length === 0) {
-      const extractedCities = [];
-      window._shippingOptions.forEach(opt => {
-        (opt.cities || []).forEach(c => {
-          if (c && c.city && !extractedCities.some(x => x.city === c.city)) {
-            extractedCities.push({
-              _id: c.city,
-              city: c.city,
-              cityOtherName: '',
-              fee: Number(c.fee) || opt.cost || 0
-            });
-          }
-        });
-      });
-      if (extractedCities.length > 0) {
-        window._fullShippingData = extractedCities;
-        try { localStorage.setItem('cached_shipping_data', JSON.stringify(extractedCities)); } catch (e) {}
-      }
+    if (carrierSelect && window._shippingOptions.length > 0) {
+      carrierSelect.innerHTML = window._shippingOptions.map(o => {
+        const val = getCarrierInternalValue(o.name);
+        return `<option value="${val}">${o.name}</option>`;
+      }).join('');
     }
   } catch (e) {
     console.warn('Error setting shipping options:', e);
@@ -228,8 +221,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error setting collections:', e);
   }
 
-  // 3. Parallel background fetch for heavy data: load shipping list from DB
-  let isShippingLoading = (!window._fullShippingData || window._fullShippingData.length === 0);
+  // 3. Parallel background fetch for heavy data: robust shipping list with public fallback
+  let isShippingLoading = true;
   window._shippingPromise = (async () => {
     try {
       let list = null;
@@ -247,10 +240,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (Array.isArray(list) && list.length > 0) {
         window._fullShippingData = list;
-        try { localStorage.setItem('cached_shipping_data', JSON.stringify(list)); } catch (e) {}
+        try { localStorage.setItem('cached_shipping_data', JSON.stringify(list)); } catch (e) { }
       }
     } catch (err) {
-      console.warn('Failed to load shipping list from server:', err);
+      console.warn('Failed to load shipping list from server, maintaining fallback:', err);
     } finally {
       isShippingLoading = false;
       if (typeof window.reRenderGovDropdownIfOpen === 'function') {
@@ -290,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (searchInput && dropdown) {
     searchInput.addEventListener('focus', () => renderGovDropdown());
     searchInput.addEventListener('input', () => renderGovDropdown());
-    
+
     document.addEventListener('click', (e) => {
       const container = document.getElementById('gov-search-container');
       if (container && !container.contains(e.target)) {
@@ -300,15 +293,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderGovDropdown() {
       const query = (searchInput.value || '').trim();
-      const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+      const shippingList = (Array.isArray(window._fullShippingData) && window._fullShippingData.length > 0)
+        ? window._fullShippingData
+        : FALLBACK_EGYPT_GOVERNORATES;
 
-      const filtered = shippingList.filter(s => 
+      const filtered = shippingList.filter(s =>
         smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
       );
 
       if (filtered.length === 0) {
         if (isShippingLoading) {
-          dropdown.innerHTML = '<div style="padding: 12px; color: #64748b; text-align: center; font-size: 0.9rem;">جاري تحميل المدن من قاعدة البيانات...</div>';
+          dropdown.innerHTML = '<div style="padding: 12px; color: #64748b; text-align: center; font-size: 0.9rem;">جاري تحميل المحافظات...</div>';
         } else {
           dropdown.innerHTML = '<div style="padding: 12px; color: #94a3b8; text-align: center; font-size: 0.9rem;">لا توجد نتائج مطابقة</div>';
         }
@@ -632,12 +627,12 @@ window.toggleProductVariants = function (pid) {
   }
 };
 
-window.handleModalSelect = function(pid, checked) {
+window.handleModalSelect = function (pid, checked) {
   if (checked) modalSelectedProducts.add(pid);
   else modalSelectedProducts.delete(pid);
 };
 
-window.handleModalVariantSelect = function(pid, comboStr, price, checked) {
+window.handleModalVariantSelect = function (pid, comboStr, price, checked) {
   const key = `${pid}-${comboStr}`;
   if (checked) {
     modalSelectedVariants.set(key, { pid, combo: JSON.parse(decodeURIComponent(comboStr)), price });
@@ -872,12 +867,12 @@ window.openItemDiscountModal = function (idx) {
 window.previewItemDiscount = function () {
   const val = parseFloat(document.getElementById('modal-item-discount').value) || 0;
   const preview = document.getElementById('discount-preview');
-  
+
   if (val === 0 || isNaN(val)) {
     preview.style.display = 'none';
     return;
   }
-  
+
   preview.style.display = 'block';
   if (val > 0) {
     preview.textContent = `خصم: ${val.toLocaleString('ar-EG')} ج.م`;
@@ -924,7 +919,7 @@ function renderCart() {
 
   container.innerHTML = cartItems.map((c, i) => {
     const p = c.product;
-    
+
     // Find matching variant option specific image url
     let finalImageUrl = '';
     if (p && p.variants && c.selectedOptions && c.selectedOptions.length > 0) {
@@ -936,7 +931,7 @@ function renderCart() {
         finalImageUrl = matchingVariant.imageUrl;
       }
     }
-    
+
     // Fall back to product base image url
     if (!finalImageUrl && p) {
       finalImageUrl = (p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || '');
@@ -948,7 +943,7 @@ function renderCart() {
 
     const optText = (c.selectedOptions || []).map(op => op.label).join(' / ');
     const effectiveUnitPrice = c.price !== undefined ? c.price : ((p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice);
-    
+
     const available = getAvailableQty(p, c.selectedOptions);
     const lowStock = available !== Infinity && c.quantity > available;
 
@@ -962,10 +957,10 @@ function renderCart() {
             <div style="text-align: right; display: flex; flex-direction: column; justify-content: center; min-width: 0;">
               <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b; line-height: 1.2; word-break: break-word;">${p.name}</div>
               ${optText ? `<div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${optText}</div>` : ''}
-              ${c.discount ? (c.discount > 0 
-                ? `<div style="font-size:0.75rem; color:#dc2626; margin-top:4px; font-weight:600;">خصم: ${formatPrice(c.discount)}</div>` 
-                : `<div style="font-size:0.75rem; color:#10b981; margin-top:4px; font-weight:600;">زياده ${Math.abs(c.discount)} ج.م</div>`
-              ) : ''}
+              ${c.discount ? (c.discount > 0
+        ? `<div style="font-size:0.75rem; color:#dc2626; margin-top:4px; font-weight:600;">خصم: ${formatPrice(c.discount)}</div>`
+        : `<div style="font-size:0.75rem; color:#10b981; margin-top:4px; font-weight:600;">زياده ${Math.abs(c.discount)} ج.م</div>`
+      ) : ''}
               ${lowStock ? `<div style="font-size:0.75rem; color:#b45309; margin-top:4px; font-weight:600; background:#fef3c7; padding:2px; border-radius:4px; display:inline-block;">الباقي : ${available} قطعة</div>` : ''}
             </div>
           </div>
@@ -1007,11 +1002,11 @@ function itemTotal(c) {
   return Math.max(0, effectiveUnitPrice * c.quantity - (c.discount || 0));
 }
 
-window.handleCityChange = async function() {
+window.handleCityChange = async function () {
   window.handleCarrierChange();
 };
 
-window.handleCarrierChange = function() {
+window.handleCarrierChange = function () {
   recalcSummary();
 };
 
@@ -1020,11 +1015,13 @@ window.recalcSummary = function () {
   cartItems.forEach(c => subtotal += itemTotal(c));
   const cityId = document.getElementById('c-gov')?.value || '';
   const searchCityName = document.getElementById('c-gov-search')?.value.trim() || '';
-  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
+    ? window._fullShippingData
+    : FALLBACK_EGYPT_GOVERNORATES;
   const data = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = data ? (data.cityOtherName || data.city) : searchCityName;
 
-  const carrierVal = document.getElementById('c-carrier')?.value || '';
+  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
   const shipDetails = resolveShippingDetails(cityName, carrierVal);
   const shipping = cityName ? shipDetails.fee : 0;
 
@@ -1055,8 +1052,10 @@ window.submitOrder = async function () {
   const phone = document.getElementById('c-phone')?.value.trim() || '';
   const address = document.getElementById('c-address')?.value.trim() || '';
   const cityId = document.getElementById('c-gov')?.value || '';
-  
-  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+
+  const shippingList = (window._fullShippingData && window._fullShippingData.length > 0)
+    ? window._fullShippingData
+    : FALLBACK_EGYPT_GOVERNORATES;
   const govData = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = govData ? (govData.cityOtherName || govData.city) : (document.getElementById('c-gov-search')?.value.trim() || '');
 
@@ -1072,7 +1071,7 @@ window.submitOrder = async function () {
   }
 
   // Resolve carrier first
-  const carrierVal = document.getElementById('c-carrier')?.value || '';
+  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
   const shipDetails = resolveShippingDetails(cityName, carrierVal);
   const carrier = shipDetails.carrier;
   const shippingFee = shipDetails.fee;
@@ -1114,13 +1113,13 @@ window.submitOrder = async function () {
   const paymentMethodVal = selectedPayRadio ? selectedPayRadio.value : 'الدفع عند الاستلام';
 
   const payload = {
-    customer: { 
-      name, 
-      phone, 
-      secondPhone: document.getElementById('c-second-phone')?.value.trim() || '', 
-      address, 
-      government: cityName, 
-      notes: document.getElementById('c-notes')?.value.trim() || '' 
+    customer: {
+      name,
+      phone,
+      secondPhone: document.getElementById('c-second-phone')?.value.trim() || '',
+      address,
+      government: cityName,
+      notes: document.getElementById('c-notes')?.value.trim() || ''
     },
     items: finalItems,
     discount: parseFloat(document.getElementById('order-discount').value) || 0,
@@ -1133,7 +1132,7 @@ window.submitOrder = async function () {
   try {
     const res = await api.createOrder(payload);
     showToast('تم إنشاء الطلب بنجاح!');
-    
+
     // If the order was created from a recovered abandoned cart, delete the abandoned cart from the database
     const params = new URLSearchParams(window.location.search);
     const recoverCartId = params.get('recoverCartId');
@@ -1170,7 +1169,7 @@ window.handleSearchClick = function () {
   const input = document.getElementById('customer-search');
   const display = document.getElementById('selected-customer-display');
   const dropdown = document.getElementById('customer-dropdown');
-  
+
   if (display && display.classList.contains('active')) {
     // If already selected, just toggle dropdown
     dropdown.classList.toggle('active');
@@ -1202,8 +1201,8 @@ window.setupCustomerSearch = function () {
       renderCustomerDropdown(allCustomers);
       return;
     }
-    const filtered = allCustomers.filter(c => 
-      (c.name && smartMatch(c.name, q)) || 
+    const filtered = allCustomers.filter(c =>
+      (c.name && smartMatch(c.name, q)) ||
       (c.phone && c.phone.includes(q))
     );
     renderCustomerDropdown(filtered);
@@ -1232,7 +1231,7 @@ function resetCustomerSelectionUI() {
     display.classList.remove('active');
     if (input) input.style.display = 'block';
     if (icon) icon.style.display = 'block';
-    
+
     // Clear fields
     if (nameField) {
       nameField.value = '';
@@ -1286,12 +1285,12 @@ window.selectCustomer = async function (phone) {
   if (window._shippingPromise && (!window._fullShippingData || window._fullShippingData.length === 0)) {
     try {
       await window._shippingPromise;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const clean = (p) => String(p || '').replace(/[^0-9]/g, '').replace(/^20/, '0').replace(/^2/, '');
   const targetClean = clean(phone);
-  const customer = allCustomers.find(c => 
+  const customer = allCustomers.find(c =>
     String(c.phone).trim() === String(phone).trim() ||
     (c._id && String(c._id).trim() === String(phone).trim()) ||
     (targetClean && clean(c.phone) === targetClean)
@@ -1304,7 +1303,7 @@ window.selectCustomer = async function (phone) {
   if (phoneEl) phoneEl.value = customer.phone || '';
   const secondPhoneEl = document.getElementById('c-second-phone');
   if (secondPhoneEl) secondPhoneEl.value = customer.secondPhone || '';
-  
+
   // Map government name to ID or match by normalized name
   const govName = (customer.government || '').trim();
   const normalizeCity = (s) => (s || '')
@@ -1317,9 +1316,9 @@ window.selectCustomer = async function (phone) {
     .trim();
 
   const normGov = normalizeCity(govName);
-  const govData = (window._fullShippingData || []).find(s => 
+  const govData = (window._fullShippingData || []).find(s =>
     s._id === govName ||
-    s.city === govName || 
+    s.city === govName ||
     s.cityOtherName === govName ||
     (normGov && (normalizeCity(s.city) === normGov || normalizeCity(s.cityOtherName) === normGov))
   );
@@ -1334,12 +1333,12 @@ window.selectCustomer = async function (phone) {
   await handleCityChange();
   const addressEl = document.getElementById('c-address');
   if (addressEl) addressEl.value = customer.address || '';
-  
+
   const searchInputCust = document.getElementById('customer-search');
   if (searchInputCust) searchInputCust.value = customer.name || customer.phone;
   const custDropdown = document.getElementById('customer-dropdown');
   if (custDropdown) custDropdown.classList.remove('active');
-  
+
   // Update UI to "selected" state
   const input = document.getElementById('customer-search');
   const icon = document.getElementById('customer-search-icon');
@@ -1353,7 +1352,7 @@ window.selectCustomer = async function (phone) {
     if (sAvatar) sAvatar.textContent = initials;
     if (sName) sName.textContent = customer.name || 'بدون اسم';
     if (sPhone) sPhone.textContent = '+' + customer.phone;
-    
+
     display.classList.add('active');
     if (input) input.style.display = 'none';
     if (icon) icon.style.display = 'none';
@@ -1366,7 +1365,7 @@ window.selectCustomer = async function (phone) {
   // Disable editing of primary info for selected customers
   if (nameEl) nameEl.readOnly = false;
   if (phoneEl) phoneEl.readOnly = false;
-  
+
   if (window.recalcSummary) recalcSummary();
   if (window.markAsModified) window.markAsModified();
 };
@@ -1375,7 +1374,7 @@ window.toggleCustomerMode = function (autoExpand = true) {
   const mode = document.querySelector('input[name="customer_type"]:checked')?.value;
   const existingSection = document.getElementById('existing-customer-section');
   const fields = document.getElementById('customer-fields');
-  
+
   if (mode === 'new') {
     if (existingSection) existingSection.style.display = 'none';
     if (fields) fields.style.display = 'block';
@@ -1394,19 +1393,19 @@ window.toggleCustomerMode = function (autoExpand = true) {
     if (govSearch) govSearch.value = '';
     const custSearch = document.getElementById('customer-search');
     if (custSearch) custSearch.value = '';
-    
+
     // Reset selected UI
     resetCustomerSelectionUI();
   } else {
     if (existingSection) existingSection.style.display = 'block';
-    
+
     // In existing customer mode, hide the input fields until a customer is chosen
     const display = document.getElementById('selected-customer-display');
     const isSelected = display && display.classList.contains('active');
     if (fields) {
       fields.style.display = isSelected ? 'block' : 'none';
     }
-    
+
     if (autoExpand) {
       // Proactively expand/show the customer dropdown list and focus the input when Exist Customer is selected!
       const dropdown = document.getElementById('customer-dropdown');

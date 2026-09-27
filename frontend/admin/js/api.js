@@ -165,6 +165,13 @@ const api = {
   activateOrdersBatch(orderIds) { return this._request('/orders/activate/batch', { method: 'POST', body: JSON.stringify({ orderIds }), admin: true }); },
   deleteOrdersBatch(orderIds) { return this._request('/orders/delete/batch', { method: 'POST', body: JSON.stringify({ orderIds }), admin: true }); },
   shipOrdersBulk(orderIds) { return this._request('/orders/bulk/ship', { method: 'POST', body: JSON.stringify({ orderIds }), admin: true }); },
+  triggerOrderPaid(id) {
+    return this._request(`/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ forcePaymentWebhook: true }),
+      admin: true
+    });
+  },
 
   // Abandoned Carts
   getAbandonedCarts(page = 1, limit = 25) { return this._request(`/abandoned-carts?page=${page}&limit=${limit}`, { admin: true }); },
