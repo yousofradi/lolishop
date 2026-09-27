@@ -563,7 +563,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── PWA Initialization ──
   const initPWA = () => {
     // 1. Generate Dynamic Manifest with Store Logo
-    const storeLogo = localStorage.getItem('loli_store_logo') || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    let rawLogo = localStorage.getItem('loli_store_logo') || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    let storeLogo = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    try {
+      storeLogo = new URL(rawLogo, window.location.origin).href;
+    } catch (e) {}
+
     const storeName = localStorage.getItem('loli_store_name') || 'LoliShop Admin';
 
     const manifest = {

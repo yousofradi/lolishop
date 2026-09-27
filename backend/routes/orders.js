@@ -46,15 +46,15 @@ function calcTotals(items, shippingFee, orderDiscount = 0) {
   return { subtotal, totalPrice };
 }
 
-// Helper: Resolve shipping fee and carrier
+// Helper: Resolve shipping fee and carrier dynamically from database
 async function resolveShippingFeeAndCarrier(customer, inputCarrier, providedShippingFee) {
-  let carrier = 'egyptpost';
+  let carrier = inputCarrier || '';
   let shippingFee = providedShippingFee !== undefined ? Number(providedShippingFee) : 0;
 
   try {
     const Setting = require('../models/Setting');
     const shippingOptionsRecord = await Setting.findOne({ key: 'shipping_options' });
-    const shippingOptions = shippingOptionsRecord ? shippingOptionsRecord.value : [];
+    const shippingOptions = (shippingOptionsRecord && Array.isArray(shippingOptionsRecord.value)) ? shippingOptionsRecord.value : [];
 
     const isCityEqual = (a, b) => {
       if (!a || !b) return false;
@@ -64,43 +64,37 @@ async function resolveShippingFeeAndCarrier(customer, inputCarrier, providedShip
 
     const Shipping = require('../models/Shipping');
     const record = await Shipping.findOne({ $or: [{ city: customer.government }, { cityOtherName: customer.government }] });
+    const cityName = record ? (record.cityOtherName || record.city) : customer.government;
 
+    // 1. Match carrier option from DB
+    const selectedOption = (shippingOptions || []).find(o => 
+      o.name === inputCarrier || (inputCarrier && o.name && o.name.toLowerCase().trim() === inputCarrier.toLowerCase().trim())
+    ) || (shippingOptions || [])[0];
+
+    if (selectedOption) {
+      carrier = selectedOption.name;
+    }
+
+    // 2. Resolve fee from DB if not explicitly provided
     if (providedShippingFee === undefined) {
-      const cityName = record ? (record.cityOtherName || record.city) : customer.government;
-
-      const postOption = (shippingOptions || []).find(o =>
-        o.name.includes('البريد') || o.name.toLowerCase().includes('post')
-      ) || (shippingOptions || [])[0];
-
-      const cityObj = postOption ? (postOption.cities || []).find(c =>
+      const cityObj = selectedOption ? (selectedOption.cities || []).find(c =>
         isCityEqual(c.city, cityName) ||
         (record && (isCityEqual(c.city, record.city) || isCityEqual(c.city, record.cityOtherName)))
       ) : null;
 
       if (cityObj && cityObj.fee !== undefined && !isNaN(Number(cityObj.fee))) {
         shippingFee = Number(cityObj.fee);
+      } else if (selectedOption && selectedOption.cost !== undefined && !isNaN(Number(selectedOption.cost))) {
+        shippingFee = Number(selectedOption.cost);
       } else if (record && record.fee !== undefined && !isNaN(Number(record.fee))) {
         shippingFee = Number(record.fee);
-      } else {
-        const defaultFees = require('../config/shipping');
-        let matchedFee = null;
-        for (const [gov, fee] of Object.entries(defaultFees)) {
-          if (isCityEqual(gov, cityName) || (record && (isCityEqual(gov, record.city) || isCityEqual(gov, record.cityOtherName)))) {
-            matchedFee = fee;
-            break;
-          }
-        }
-        shippingFee = matchedFee !== null ? matchedFee : (defaultFees[customer.government] || 85);
       }
     }
   } catch (e) {
-    if (providedShippingFee === undefined) {
-      const defaultFees = require('../config/shipping');
-      shippingFee = defaultFees[customer.government] || 85;
-    }
+    console.error('Error resolving shipping fee from DB:', e.message);
   }
 
-  return { shippingFee, carrier: 'egyptpost' };
+  return { shippingFee, carrier };
 }
 
 
@@ -109,7 +103,7 @@ async function resolveShippingFeeAndCarrier(customer, inputCarrier, providedShip
 // POST /api/orders — create order (public from storefront OR admin)
 router.post('/', async (req, res) => {
   try {
-    const { customer, items, paymentMethod, discount = 0, paidAmount = 0, shippingFee: providedShippingFee } = req.body;
+    const { customer, items, paymentMethod, discount = 0, paidAmount = 0, shippingFee: providedShippingFee, carrier: providedCarrier } = req.body;
     normalizeCustomerDigits(customer);
 
     if (!customer || !items || !Array.isArray(items) || items.length === 0) {
@@ -122,18 +116,16 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Valid payment method is required' });
     }
 
-    // Shipping fee and Carrier resolution (server-side authority):
-    let carrier = 'egyptpost';
-    let shippingFee = 0;
+    // Shipping fee and Carrier resolution (from DB authority):
+    let carrier = providedCarrier || '';
+    let shippingFee = providedShippingFee !== undefined ? Number(providedShippingFee) : 0;
 
     try {
-      // Recalculate shipping fee based on governorate to protect old sessions from stale cached fees
-      const resolved = await resolveShippingFeeAndCarrier(customer, 'egyptpost', undefined);
-      carrier = 'egyptpost';
+      const resolved = await resolveShippingFeeAndCarrier(customer, carrier, providedShippingFee);
+      carrier = resolved.carrier || carrier;
       shippingFee = resolved.shippingFee;
     } catch (e) {
-      const defaultFees = require('../config/shipping');
-      shippingFee = defaultFees[customer.government] || 85;
+      console.error('Error resolving shipping fee in order creation:', e.message);
     }
 
     if (shippingFee === 0 && !customer.government) {

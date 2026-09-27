@@ -34,13 +34,6 @@ let collectionsMap = {};
 let shippingMap = {};
 let cartItems = []; // [{ product, quantity, selectedOptions, discount }]
 
-function getCarrierInternalValue(name) {
-  if (!name) return 'egyptpost';
-  if (name.includes('بوسطة') || name.toLowerCase().includes('bosta')) return 'bosta';
-  if (name.includes('البريد') || name.toLowerCase().includes('post')) return 'egyptpost';
-  return name;
-}
-
 function resolveShippingDetails(cityName, forcedCarrier) {
   const isCityEqual = (a, b) => {
     if (!a || !b) return false;
@@ -48,26 +41,90 @@ function resolveShippingDetails(cityName, forcedCarrier) {
     return norm(a) === norm(b);
   };
 
-  let carrier = forcedCarrier || 'egyptpost';
-  let govData = (window._fullShippingData || []).find(s => 
-    isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
-  );
+  const carrier = forcedCarrier || (window._shippingOptions && window._shippingOptions[0] ? window._shippingOptions[0].name : '');
+  const selectedOption = (window._shippingOptions || []).find(o => o.name === carrier) || (window._shippingOptions || [])[0];
 
   let fee = 0;
-  if (!window._shippingOptions || window._shippingOptions.length === 0) {
-    fee = govData ? (govData.fee || 0) : 0;
-  } else {
-    const selectedOption = window._shippingOptions.find(o => getCarrierInternalValue(o.name) === carrier) || window._shippingOptions[0];
-    if (!forcedCarrier && selectedOption) {
-      carrier = getCarrierInternalValue(selectedOption.name);
+  if (selectedOption) {
+    const cityObj = (selectedOption.cities || []).find(c => isCityEqual(c.city, cityName));
+    if (cityObj && cityObj.fee !== undefined && !isNaN(Number(cityObj.fee))) {
+      fee = Number(cityObj.fee);
+    } else if (selectedOption.cost !== undefined && !isNaN(Number(selectedOption.cost))) {
+      fee = Number(selectedOption.cost);
     }
-    const cityObj = selectedOption ? (selectedOption.cities || []).find(c => 
-      isCityEqual(c.city, cityName)
-    ) : null;
-    fee = cityObj ? cityObj.fee : (selectedOption ? selectedOption.cost : 0);
   }
 
-  return { fee, carrier };
+  if (!fee && Array.isArray(window._fullShippingData) && window._fullShippingData.length > 0) {
+    const govData = window._fullShippingData.find(s => 
+      isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
+    );
+    if (govData && govData.fee !== undefined && !isNaN(Number(govData.fee))) {
+      fee = Number(govData.fee);
+    }
+  }
+
+  return { fee, carrier: selectedOption ? selectedOption.name : (carrier || '') };
+}
+
+function renderPaymentMethods(globalSettings) {
+  const paymentMethodsContainer = document.getElementById('payment-methods');
+  if (!paymentMethodsContainer) return;
+
+  const methods = (globalSettings && Array.isArray(globalSettings.paymentMethods)) ? globalSettings.paymentMethods : [];
+
+  let html = `
+    <label class="payment-method-card selected" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin-bottom: 8px; border-radius: 12px; cursor: pointer;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <input type="radio" name="payment" value="الدفع عند الاستلام" checked onchange="updatePaymentUI()" style="margin:0; width: 18px; height: 18px; accent-color: var(--primary);">
+        <span class="payment-method-icon" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.04); border-radius: 8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M6 12h.01M18 12h.01"></path>
+          </svg>
+        </span>
+        <div style="text-align: right;">
+          <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b;">الدفع عند الاستلام</div>
+          <div style="font-size: 0.8rem; color: #64748b;">Cash on Delivery (COD)</div>
+        </div>
+      </div>
+    </label>
+  `;
+
+  methods.forEach((m) => {
+    if (!m || !m.label) return;
+    const isVodafone = m.label.includes('فودافون') || m.label.toLowerCase().includes('vodafone');
+    
+    html += `
+      <label class="payment-method-card" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin-bottom: 8px; border-radius: 12px; cursor: pointer;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <input type="radio" name="payment" value="${m.label}" onchange="updatePaymentUI()" style="margin:0; width: 18px; height: 18px; accent-color: var(--primary);">
+          <span class="payment-method-icon" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 8px; overflow: hidden; padding: 2px;">
+            ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;" alt="${m.label}">` : (
+              isVodafone ? `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                  <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                </svg>
+              ` : `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                  <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+              `
+            )}
+          </span>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b;">${m.label}</div>
+            ${m.number ? `<div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>` : ''}
+          </div>
+        </div>
+      </label>
+    `;
+  });
+
+  paymentMethodsContainer.innerHTML = html;
+  if (typeof updatePaymentUI === 'function') updatePaymentUI();
 }
 
 // ── Init ──────────────────────────────────────────────
@@ -82,30 +139,72 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.body.classList.add('is-loading');
 
-  // 1. Settings & shipping options
+  // Immediately initialize shipping data with cache if available
+  let cachedShipping = null;
+  try {
+    const raw = localStorage.getItem('cached_shipping_data');
+    if (raw) cachedShipping = JSON.parse(raw);
+  } catch (e) {}
+
+  window._fullShippingData = Array.isArray(cachedShipping) ? cachedShipping : [];
+
+  // 1. Settings & shipping options (load cache first for zero lag)
   let globalSettings = {};
   try {
-    let settings = await api.getSetting('loli_global_settings').catch(() => null);
+    const cachedSettings = localStorage.getItem('cached_global_settings');
+    if (cachedSettings) {
+      try { globalSettings = JSON.parse(cachedSettings); } catch (e) {}
+    }
+  } catch (e) {}
+  window._globalSettings = globalSettings;
+  renderPaymentMethods(globalSettings);
+
+  // Fetch live settings in background
+  api.getSetting('loli_global_settings').catch(() => null).then(async (settings) => {
     if (!settings || typeof settings !== 'object') {
       settings = await api.getSetting('sundura_global_settings').catch(() => null);
     }
     if (settings && typeof settings === 'object') {
-      globalSettings = settings;
+      window._globalSettings = settings;
+      renderPaymentMethods(settings);
+      try { localStorage.setItem('cached_global_settings', JSON.stringify(settings)); } catch (e) {}
     }
-  } catch (e) {
-    console.warn('Error loading settings:', e);
-  }
-  window._globalSettings = globalSettings;
+  }).catch((e) => console.warn('Error loading live settings:', e));
 
+  // Load shipping options directly from DB
   try {
-    const shippingOptionsRes = await api.getSetting('shipping_options').catch(() => []);
+    let shippingOptionsRes = await api.getSetting('shipping_options').catch(() => []);
     window._shippingOptions = Array.isArray(shippingOptionsRes) ? shippingOptionsRes : [];
     const carrierSelect = document.getElementById('c-carrier');
-    if (carrierSelect && window._shippingOptions.length > 0) {
-      carrierSelect.innerHTML = window._shippingOptions.map(o => {
-        const val = getCarrierInternalValue(o.name);
-        return `<option value="${val}">${o.name}</option>`;
-      }).join('');
+    if (carrierSelect) {
+      if (window._shippingOptions.length > 0) {
+        carrierSelect.innerHTML = window._shippingOptions.map(o => {
+          return `<option value="${o.name}">${o.name}</option>`;
+        }).join('');
+      } else {
+        carrierSelect.innerHTML = '<option value="">لا توجد خيارات شحن مسجلة</option>';
+      }
+    }
+
+    // Extract cities directly from DB shipping_options if full list not yet loaded
+    if (!window._fullShippingData || window._fullShippingData.length === 0) {
+      const extractedCities = [];
+      window._shippingOptions.forEach(opt => {
+        (opt.cities || []).forEach(c => {
+          if (c && c.city && !extractedCities.some(x => x.city === c.city)) {
+            extractedCities.push({
+              _id: c.city,
+              city: c.city,
+              cityOtherName: '',
+              fee: Number(c.fee) || opt.cost || 0
+            });
+          }
+        });
+      });
+      if (extractedCities.length > 0) {
+        window._fullShippingData = extractedCities;
+        try { localStorage.setItem('cached_shipping_data', JSON.stringify(extractedCities)); } catch (e) {}
+      }
     }
   } catch (e) {
     console.warn('Error setting shipping options:', e);
@@ -129,16 +228,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error setting collections:', e);
   }
 
-  // 3. Parallel background fetch for heavy data
-  window._shippingPromise = api.getShippingList().then(shippingRes => {
-    const list = Array.isArray(shippingRes) ? shippingRes : (shippingRes?.shipping || []);
-    window._fullShippingData = list;
-    return list;
-  }).catch((err) => {
-    console.warn('Failed to load shipping list:', err);
-    window._fullShippingData = [];
-    return [];
-  });
+  // 3. Parallel background fetch for heavy data: load shipping list from DB
+  let isShippingLoading = (!window._fullShippingData || window._fullShippingData.length === 0);
+  window._shippingPromise = (async () => {
+    try {
+      let list = null;
+      try {
+        const shippingRes = await api.getShippingList();
+        list = Array.isArray(shippingRes) ? shippingRes : (shippingRes?.shipping || null);
+      } catch (err) {
+        console.warn('api.getShippingList failed, trying api.getShipping()...', err);
+      }
+
+      if (!list || list.length === 0) {
+        const publicRes = await api.getShipping().catch(() => null);
+        list = Array.isArray(publicRes) ? publicRes : (publicRes?.shipping || null);
+      }
+
+      if (Array.isArray(list) && list.length > 0) {
+        window._fullShippingData = list;
+        try { localStorage.setItem('cached_shipping_data', JSON.stringify(list)); } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('Failed to load shipping list from server:', err);
+    } finally {
+      isShippingLoading = false;
+      if (typeof window.reRenderGovDropdownIfOpen === 'function') {
+        window.reRenderGovDropdownIfOpen();
+      }
+    }
+    return window._fullShippingData;
+  })();
 
   window._productsPromise = api.getProducts(1, 1000, true).then(productsRes => {
     const rawProducts = Array.isArray(productsRes) ? productsRes : (productsRes?.products || []);
@@ -181,22 +301,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderGovDropdown() {
       const query = (searchInput.value || '').trim();
       const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+
       const filtered = shippingList.filter(s => 
         smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
       );
 
       if (filtered.length === 0) {
-        dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد نتائج</div>';
+        if (isShippingLoading) {
+          dropdown.innerHTML = '<div style="padding: 12px; color: #64748b; text-align: center; font-size: 0.9rem;">جاري تحميل المدن من قاعدة البيانات...</div>';
+        } else {
+          dropdown.innerHTML = '<div style="padding: 12px; color: #94a3b8; text-align: center; font-size: 0.9rem;">لا توجد نتائج مطابقة</div>';
+        }
       } else {
-        dropdown.innerHTML = filtered.map(s => `
-          <div class="dropdown-item" style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; text-align:right;" 
-               onclick="selectGov('${s._id}', '${(s.cityOtherName || s.city || '').replace(/'/g, "\\'")}')">
-            ${s.cityOtherName || s.city}
-          </div>
-        `).join('');
+        dropdown.innerHTML = filtered.map(s => {
+          const displayName = s.cityOtherName ? `${s.city} (${s.cityOtherName})` : s.city;
+          const safeName = (s.city || s.cityOtherName || '').replace(/'/g, "\\'");
+          const safeId = (s._id || s.city || '').replace(/'/g, "\\'");
+          return `
+            <div class="dropdown-item" style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; text-align:right;" 
+                 onclick="selectGov('${safeId}', '${safeName}')">
+              ${displayName}
+            </div>
+          `;
+        }).join('');
       }
       dropdown.style.display = 'block';
     }
+
+    window.reRenderGovDropdownIfOpen = () => {
+      if (dropdown.style.display === 'block' || document.activeElement === searchInput) {
+        renderGovDropdown();
+      }
+    };
 
     window.selectGov = (id, name) => {
       if (hiddenInput) hiddenInput.value = id;
@@ -204,26 +340,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       dropdown.style.display = 'none';
       handleCityChange();
     };
+
+    window.handleCityChange = function () {
+      recalcSummary();
+    };
   }
 
-  // 5. Populate Payment Methods (if provided by settings)
-  const paymentMethodsContainer = document.getElementById('payment-methods');
-  if (paymentMethodsContainer && Array.isArray(globalSettings.paymentMethods) && globalSettings.paymentMethods.length > 0) {
-    paymentMethodsContainer.innerHTML = globalSettings.paymentMethods.map((m, idx) => `
-      <label class="payment-method-card ${idx === 0 ? 'selected' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
-        <div style="display: flex; align-items: center; gap: 14px;">
-          <input type="radio" name="payment" value="${m.label}" ${idx === 0 ? 'checked' : ''} onchange="updatePaymentUI()" style="margin:0; width: 20px; height: 20px; accent-color: var(--primary);">
-          <div style="text-align: right;">
-            <div style="font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 2px;">${m.label}</div>
-            <div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>
-          </div>
-        </div>
-        <div style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; padding: 4px;">
-          ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`}
-        </div>
-      </label>
-    `).join('');
-  }
   document.body.classList.remove('is-loading');
 
   setupSearch();
@@ -898,12 +1020,13 @@ window.recalcSummary = function () {
   cartItems.forEach(c => subtotal += itemTotal(c));
   const cityId = document.getElementById('c-gov')?.value || '';
   const searchCityName = document.getElementById('c-gov-search')?.value.trim() || '';
-  const data = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
+  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+  const data = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = data ? (data.cityOtherName || data.city) : searchCityName;
 
-  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
+  const carrierVal = document.getElementById('c-carrier')?.value || '';
   const shipDetails = resolveShippingDetails(cityName, carrierVal);
-  const shipping = shipDetails.fee;
+  const shipping = cityName ? shipDetails.fee : 0;
 
   const orderDiscount = parseFloat(document.getElementById('order-discount').value) || 0;
   const total = Math.max(0, subtotal + shipping - orderDiscount);
@@ -914,8 +1037,16 @@ window.recalcSummary = function () {
 
 window.updatePaymentUI = function () {
   document.querySelectorAll('.payment-method-card').forEach(card => {
-    card.classList.toggle('selected', card.querySelector('input').checked);
+    card.classList.toggle('selected', card.querySelector('input')?.checked);
   });
+};
+
+window.handleGlobalSave = async function () {
+  return await window.submitOrder();
+};
+
+window.handleGlobalDiscard = function () {
+  location.reload();
 };
 
 window.submitOrder = async function () {
@@ -925,7 +1056,8 @@ window.submitOrder = async function () {
   const address = document.getElementById('c-address')?.value.trim() || '';
   const cityId = document.getElementById('c-gov')?.value || '';
   
-  const govData = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
+  const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+  const govData = shippingList.find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
   const cityName = govData ? (govData.cityOtherName || govData.city) : (document.getElementById('c-gov-search')?.value.trim() || '');
 
 
@@ -940,7 +1072,7 @@ window.submitOrder = async function () {
   }
 
   // Resolve carrier first
-  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
+  const carrierVal = document.getElementById('c-carrier')?.value || '';
   const shipDetails = resolveShippingDetails(cityName, carrierVal);
   const carrier = shipDetails.carrier;
   const shippingFee = shipDetails.fee;
@@ -978,6 +1110,9 @@ window.submitOrder = async function () {
     };
   });
 
+  const selectedPayRadio = document.querySelector('input[name="payment"]:checked');
+  const paymentMethodVal = selectedPayRadio ? selectedPayRadio.value : 'الدفع عند الاستلام';
+
   const payload = {
     customer: { 
       name, 
@@ -989,7 +1124,7 @@ window.submitOrder = async function () {
     },
     items: finalItems,
     discount: parseFloat(document.getElementById('order-discount').value) || 0,
-    paymentMethod: document.querySelector('input[name="payment"]:checked').value,
+    paymentMethod: paymentMethodVal,
     paidAmount: Math.max(0, parseFloat(document.getElementById('paid-amount').value) || 0),
     shippingFee: shippingFee,
     carrier: carrier

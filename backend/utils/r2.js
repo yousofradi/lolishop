@@ -2,21 +2,26 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
 const path = require('path');
 
-// Check if R2 is configured
-const isR2Configured = process.env.R2_ACCOUNT_ID && 
-                       process.env.R2_ACCESS_KEY_ID && 
-                       process.env.R2_SECRET_ACCESS_KEY && 
-                       process.env.R2_BUCKET_NAME;
+// Clean and sanitize R2 Environment Variables
+const accountId = (process.env.R2_ACCOUNT_ID || '')
+  .trim()
+  .replace(/^https?:\/\//i, '')
+  .replace(/\.r2\.cloudflarestorage\.com.*$/i, '');
+const accessKeyId = (process.env.R2_ACCESS_KEY_ID || '').trim().replace(/^["']|["']$/g, '');
+const secretAccessKey = (process.env.R2_SECRET_ACCESS_KEY || '').trim().replace(/^["']|["']$/g, '');
+const bucketName = (process.env.R2_BUCKET_NAME || '').trim().replace(/^["']|["']$/g, '');
+
+const isR2Configured = Boolean(accountId && accessKeyId && secretAccessKey && bucketName);
 
 let s3Client = null;
 
 if (isR2Configured) {
   s3Client = new S3Client({
     region: 'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+      accessKeyId: accessKeyId,
+      secretAccessKey: secretAccessKey,
     }
   });
   console.log('✅ R2: Cloudflare R2 Client Configured successfully.');
@@ -58,7 +63,7 @@ async function uploadToR2(fileBuffer, originalName, folder = 'lolishop', prefix 
 
     // 3. Upload to R2
     const uploadParams = {
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: bucketName,
       Key: filename,
       Body: optimizedBuffer,
       ContentType: 'image/webp',
@@ -69,7 +74,7 @@ async function uploadToR2(fileBuffer, originalName, folder = 'lolishop', prefix 
 
     // 4. Return the public URL
     // If R2_PUBLIC_URL is defined, use it. Otherwise, return the raw R2.dev URL (requires public access enabled in bucket settings).
-    const publicDomain = process.env.R2_PUBLIC_URL || `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev`;
+    const publicDomain = (process.env.R2_PUBLIC_URL || '').trim() || `https://pub-${accountId}.r2.dev`;
     
     // Ensure publicDomain doesn't end with a slash
     const cleanDomain = publicDomain.replace(/\/$/, '');

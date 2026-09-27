@@ -180,7 +180,13 @@ const api = {
   // Shipping
   getShipping() { return this._request('/shipping', { useCache: false }); },
   getPublicShipping() { return this._request('/shipping', { useCache: false }); },
-  getShippingList() { return this._request('/shipping/list', { admin: true, useCache: false }); },
+  async getShippingList() { 
+    try {
+      return await this._request('/shipping/list', { admin: true, useCache: false }); 
+    } catch (e) {
+      return await this.getShipping();
+    }
+  },
   createShipping(d) { return this._request('/shipping', { method: 'POST', body: JSON.stringify(d), admin: true }); },
   updateShipping(id, d) { return this._request(`/shipping/${id}`, { method: 'PUT', body: JSON.stringify(d), admin: true }); },
   deleteShipping(id) { return this._request(`/shipping/${id}`, { method: 'DELETE', admin: true }); },
@@ -194,8 +200,12 @@ const api = {
   deleteWebhook(id) { return this._request(`/webhooks/${id}`, { method: 'DELETE', admin: true }); },
 
   // Settings
-  getSetting(key, useCache = false) { 
-    return this._request(`/settings/${key}?admin=true`, { useCache, admin: true }); 
+  async getSetting(key, useCache = false) { 
+    try {
+      return await this._request(`/settings/${key}?admin=true`, { useCache, admin: true }); 
+    } catch (e) {
+      return await this._request(`/settings/${key}`, { useCache, admin: false });
+    }
   },
   async updateSetting(key, value) {
     const res = await this._request(`/settings/${key}`, { method: 'POST', body: JSON.stringify({ value }), admin: true });

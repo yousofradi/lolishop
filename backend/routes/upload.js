@@ -158,6 +158,59 @@ router.post('/public', upload.single('image'), async (req, res) => {
   }
 });
 
+// GET /api/upload/test-r2 — Test Cloudflare R2 connectivity and diagnose configuration
+router.get('/test-r2', async (req, res) => {
+  const accountId = (process.env.R2_ACCOUNT_ID || '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\.r2\.cloudflarestorage\.com.*$/i, '');
+  const accessKeyId = (process.env.R2_ACCESS_KEY_ID || '').trim();
+  const secretKey = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+  const bucketName = (process.env.R2_BUCKET_NAME || '').trim();
+  const publicUrl = (process.env.R2_PUBLIC_URL || '').trim();
+
+  const configCheck = {
+    isR2Configured,
+    hasAccountId: Boolean(accountId),
+    accountId: accountId ? (accountId.substring(0, 4) + '...' + accountId.slice(-4)) : null,
+    hasAccessKeyId: Boolean(accessKeyId),
+    accessKeyIdPrefix: accessKeyId ? accessKeyId.substring(0, 6) : null,
+    hasSecretAccessKey: Boolean(secretKey),
+    bucketName: bucketName || null,
+    publicUrl: publicUrl || null
+  };
+
+  if (!isR2Configured) {
+    return res.status(400).json({
+      success: false,
+      error: 'R2 is not configured in Environment Variables. Make sure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME are set in Render.',
+      config: configCheck
+    });
+  }
+
+  try {
+    const sharp = require('sharp');
+    const testBuffer = await sharp({
+      create: { width: 2, height: 2, channels: 4, background: { r: 232, g: 70, b: 172, alpha: 1 } }
+    }).webp().toBuffer();
+
+    const testUrl = await uploadToR2(testBuffer, 'r2-healthcheck.png', 'diagnostics');
+    res.json({
+      success: true,
+      message: 'Cloudflare R2 is configured and upload succeeded!',
+      testUrl,
+      config: configCheck
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'R2 Upload failed: ' + err.message,
+      errorCode: err.code || err.name,
+      config: configCheck
+    });
+  }
+});
+
 // GET / POST /api/upload/migrate-to-r2 — Migrate all non-R2 image URLs in DB to Cloudflare R2
 router.all('/migrate-to-r2', adminAuth, async (req, res) => {
   if (!isR2Configured) {
