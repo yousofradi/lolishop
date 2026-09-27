@@ -1,91 +1,235 @@
 /** Admin — Create Order form JS */
 
+/** Debounce function to limit API calls */
+function debounce(func, delay = 300) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+// Smart Search helper for Arabic
+function smartMatch(text, query) {
+  if (!query) return true; // Show all if no query
+  if (!text) return false;
+  const normalize = (s) => s.toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/^ال/, '')
+    .replace(/\sال/g, ' ')
+    .trim();
+  
+  const nText = normalize(text);
+  const nQuery = normalize(query);
+  
+  // Suggest if query matches any part of the text or vice versa
+  return nText.includes(nQuery) || nQuery.includes(nText);
+}
+
 let allProducts = [];
+let allCustomers = [];
+let collectionsMap = {};
 let shippingMap = {};
 let cartItems = []; // [{ product, quantity, selectedOptions, discount }]
+
+function getCarrierInternalValue(name) {
+  if (!name) return 'egyptpost';
+  if (name.includes('بوسطة') || name.toLowerCase().includes('bosta')) return 'bosta';
+  if (name.includes('البريد') || name.toLowerCase().includes('post')) return 'egyptpost';
+  return name;
+}
+
+function resolveShippingDetails(cityName, forcedCarrier) {
+  const isCityEqual = (a, b) => {
+    if (!a || !b) return false;
+    const norm = (s) => s.replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, '').toLowerCase().trim();
+    return norm(a) === norm(b);
+  };
+
+  let carrier = forcedCarrier || 'egyptpost';
+  let govData = (window._fullShippingData || []).find(s => 
+    isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
+  );
+
+  let fee = 0;
+  if (!window._shippingOptions || window._shippingOptions.length === 0) {
+    fee = govData ? (govData.fee || 0) : 0;
+  } else {
+    const selectedOption = window._shippingOptions.find(o => getCarrierInternalValue(o.name) === carrier) || window._shippingOptions[0];
+    if (!forcedCarrier && selectedOption) {
+      carrier = getCarrierInternalValue(selectedOption.name);
+    }
+    const cityObj = selectedOption ? (selectedOption.cities || []).find(c => 
+      isCityEqual(c.city, cityName)
+    ) : null;
+    fee = cityObj ? cityObj.fee : (selectedOption ? selectedOption.cost : 0);
+  }
+
+  return { fee, carrier };
+}
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAdmin()) return;
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const recoverCartId = urlParams.get('recoverCartId');
+  const preloadedCartPromise = (recoverCartId && typeof api.getAbandonedCart === 'function')
+    ? api.getAbandonedCart(recoverCartId).catch(() => null)
+    : null;
+
   document.body.classList.add('is-loading');
 
   try {
-    const [settings, collectionsRes] = await Promise.all([
-      api.getSetting('loli_global_settings').catch(() => ({})),
+    const [settings, shippingOptionsRes, collectionsRes] = await Promise.all([
+      api.getSetting('loli_global_settings').catch(() => api.getSetting('sundura_global_settings')).catch(() => ({})),
+      api.getSetting('shipping_options').catch(() => []),
       api.getCollections().catch(() => [])
     ]);
 
-    // Background fetch heavy payloads
-    Promise.all([
-      api.getProducts(1, 1000, true).catch(() => []),
-      api.getShipping().catch(() => ({}))
-    ]).then(([productsRes, shippingRes]) => {
-      allProducts = (productsRes.products || productsRes).filter(p => p.status !== 'draft');
-      let shipping = shippingRes;
-      if (Object.keys(shipping).length === 0) {
-        shipping = { 'Cairo': 45, 'Giza': 45, 'Alexandria': 55 };
-      }
-      shippingMap = shipping;
-      const govSelect = document.getElementById('c-gov');
-      if (govSelect) {
-        Object.keys(shippingMap).forEach(gov => {
-          govSelect.add(new Option(gov, gov));
-        });
-      }
-    });
-
-    let shipping = {};
-
-    // Fallback if DB is empty
-    if (Object.keys(shipping).length === 0) {
-      shipping = {
-        'القاهرة': 85, 'الجيزة': 85, 'الإسكندرية': 85, 'البحيرة': 85, 'القليوبية': 85, 'الغربية': 85, 'المنوفية': 85, 'دمياط': 85, 'الدقهلية': 85, 'كفر الشيخ': 85, 'الشرقية': 85, 'الاسماعيلية': 95, 'السويس': 95, 'بورسعيد': 95, 'الفيوم': 110, 'بني سويف': 110, 'المنيا': 110, 'اسيوط': 110, 'سوهاج': 130, 'قنا': 130, 'أسوان': 130, 'الأقصر': 130, 'البحر الأحمر': 130, 'مرسي مطروح': 135, 'الوادي الجديد': 135, 'شمال سيناء': 135, 'جنوب سيناء': 135
-      };
-    }
-
-    allProducts = products;
-    shippingMap = shipping;
+    window._globalSettings = settings || {};
+    window._shippingOptions = shippingOptionsRes || [];
 
     // Populate Collections Map and Modal Dropdown
     const colFilter = document.getElementById('modal-col-filter');
     if (colFilter) {
       colFilter.innerHTML = '<option value="">جميع المنتجات</option>';
-      collectionsRes.forEach(c => {
+      (collectionsRes || []).forEach(c => {
         collectionsMap[c._id] = c.name;
         colFilter.add(new Option(c.name, c._id));
       });
     }
 
-    const govSelect = document.getElementById('c-gov');
-    if (govSelect) {
-      Object.keys(shippingMap).forEach(gov => {
-        govSelect.add(new Option(gov, gov));
+    // Parallel non-blocking background fetch
+    window._shippingPromise = api.getShippingList().then(shippingRes => {
+      window._fullShippingData = shippingRes || [];
+      return shippingRes || [];
+    }).catch(() => {
+      window._fullShippingData = [];
+      return [];
+    });
+
+    window._productsPromise = api.getProducts(1, 1000, true).then(productsRes => {
+      const products = (productsRes.products || productsRes || []).filter(p => p.status !== 'draft');
+      allProducts = products;
+      if (typeof window.renderModalProducts === 'function') {
+        window.renderModalProducts();
+      }
+      return products;
+    }).catch(() => []);
+
+    // Customers payload is heavy and only used for existing customer search autocomplete
+    api.getCustomers().then(customersRes => {
+      allCustomers = customersRes || [];
+    }).catch(() => []);
+
+    window._initialDataPromise = Promise.all([window._shippingPromise, window._productsPromise]);
+
+    const carrierSelect = document.getElementById('c-carrier');
+    if (carrierSelect && window._shippingOptions && window._shippingOptions.length > 0) {
+      carrierSelect.innerHTML = window._shippingOptions.map(o => {
+        const val = getCarrierInternalValue(o.name);
+        return `<option value="${val}">${o.name}</option>`;
+      }).join('');
+    }
+
+    const searchInput = document.getElementById('c-gov-search');
+    const dropdown = document.getElementById('gov-dropdown');
+    const hiddenInput = document.getElementById('c-gov');
+
+    if (searchInput && dropdown) {
+      searchInput.addEventListener('focus', () => renderGovDropdown());
+      searchInput.addEventListener('input', () => renderGovDropdown());
+      
+      document.addEventListener('click', (e) => {
+        if (!document.getElementById('gov-search-container').contains(e.target)) {
+          dropdown.style.display = 'none';
+        }
       });
+
+        function renderGovDropdown() {
+          const query = searchInput.value.trim();
+          const shippingList = window._fullShippingData || [];
+          const filtered = shippingList.filter(s => 
+            smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
+          );
+
+        if (filtered.length === 0) {
+          dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد نتائج</div>';
+        } else {
+          dropdown.innerHTML = filtered.map(s => `
+            <div class="dropdown-item" style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; text-align:right;" 
+                 onclick="selectGov('${s._id}', '${s.cityOtherName || s.city}')">
+              ${s.cityOtherName || s.city}
+            </div>
+          `).join('');
+        }
+        dropdown.style.display = 'block';
+      }
+
+      window.selectGov = (id, name) => {
+        hiddenInput.value = id;
+        searchInput.value = name;
+        dropdown.style.display = 'none';
+        handleCityChange(); // Trigger existing city change logic
+      };
     }
 
     // Populate Payment Methods
     const paymentMethodsContainer = document.getElementById('payment-methods');
     if (paymentMethodsContainer && settings.paymentMethods) {
       paymentMethodsContainer.innerHTML = settings.paymentMethods.map((m, idx) => `
-        <label class="payment-method-card ${idx === 0 ? 'selected' : ''}">
-          <input type="radio" name="payment" value="${m.label}" ${idx === 0 ? 'checked' : ''} onchange="updatePaymentUI()">
-          <span class="payment-method-icon">
-            ${m.logo ? `<img src="${m.logo}" style="width:24px; height:24px; object-fit:contain; margin-bottom:4px;">` : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`}
-            <div class="payment-method-label">${m.label}</div>
-            <div class="payment-method-desc">${m.number}</div>
-          </span>
+        <label class="payment-method-card ${idx === 0 ? 'selected' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <input type="radio" name="payment" value="${m.label}" ${idx === 0 ? 'checked' : ''} onchange="updatePaymentUI()" style="margin:0; width: 20px; height: 20px; accent-color: var(--primary);">
+            <div style="text-align: right;">
+              <div style="font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 2px;">${m.label}</div>
+              <div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>
+            </div>
+          </div>
+          <div style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; padding: 4px;">
+            ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`}
+          </div>
         </label>
       `).join('');
     }
     document.body.classList.remove('is-loading');
   } catch (err) {
+    console.error('Failed to load store data:', err);
     showToast('فشل تحميل بيانات المتجر', 'error');
     document.body.classList.remove('is-loading');
   }
 
   setupSearch();
+  setupCustomerSearch();
   updatePaymentUI();
+
+  // ── Validation Listeners ──
+  const nameInput = document.getElementById('c-name');
+  if (nameInput) {
+    nameInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      // Remove any non-Arabic characters (except spaces)
+      const cleaned = val.replace(/[^\u0600-\u06FF\s]/g, '');
+      if (val !== cleaned) {
+        e.target.value = cleaned;
+      }
+    });
+  }
+
+  const phoneInput = document.getElementById('c-phone');
+  if (phoneInput) {
+    phoneInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      // Remove any non-standard digits (except +)
+      const cleaned = val.replace(/[^0-9+]/g, '');
+      if (val !== cleaned) {
+        e.target.value = cleaned;
+      }
+    });
+  }
 
   // Global Save Handler for the unsaved changes bar
   window.handleGlobalSave = async () => {
@@ -100,51 +244,224 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fields = ['c-name', 'c-phone', 'c-second-phone', 'c-gov', 'c-address', 'c-notes', 'order-discount', 'paid-amount'];
     fields.forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.value = (id === 'order-discount' ? '0' : '');
+      if (el) el.value = '';
     });
     updatePaymentUI();
     recalcSummary();
     if (window.hideBar) window.hideBar();
   };
+
+  // Set initial customer mode on load (defaults to existing with hidden fields)
+  toggleCustomerMode(false);
+
+  // Check if recovering an abandoned cart
+  if (recoverCartId) {
+    await recoverAbandonedCart(recoverCartId, preloadedCartPromise);
+  }
 });
 
+async function recoverAbandonedCart(cartId, preloadedCartPromise) {
+  try {
+    // 1. Fetch the abandoned cart immediately without waiting for heavy background payloads
+    let cart = preloadedCartPromise ? await preloadedCartPromise : null;
+    if (!cart && typeof api.getAbandonedCart === 'function') {
+      cart = await api.getAbandonedCart(cartId).catch(() => null);
+    }
+
+    if (!cart) {
+      let page = 1;
+      let limit = 25;
+      while (!cart && page <= 5) {
+        const res = await api.getAbandonedCarts(page, limit).catch(() => ({}));
+        const carts = res.carts || res || [];
+        cart = carts.find(c => String(c._id) === String(cartId));
+        if (cart || !carts.length || carts.length < limit) break;
+        page++;
+      }
+    }
+
+    if (!cart) {
+      document.body.classList.remove('is-loading');
+      showToast('السلة المتروكة غير موجودة أو تم حذفها', 'error');
+      return;
+    }
+
+    // 2. Populate Customer Fields INSTANTLY
+    if (cart.customer) {
+      if (document.getElementById('c-name')) document.getElementById('c-name').value = cart.customer.name || '';
+      if (document.getElementById('c-phone')) document.getElementById('c-phone').value = cart.customer.phone || '';
+      if (document.getElementById('c-second-phone')) document.getElementById('c-second-phone').value = cart.customer.secondPhone || '';
+      if (document.getElementById('c-address')) document.getElementById('c-address').value = cart.customer.address || '';
+      if (document.getElementById('c-notes')) document.getElementById('c-notes').value = cart.customer.notes || '';
+
+      const rawGov = (cart.customer.government || cart.customer.city || cart.customer.addressCity || '').trim();
+      if (rawGov && document.getElementById('c-gov-search')) {
+        document.getElementById('c-gov-search').value = rawGov;
+      }
+    }
+
+    // 3. Populate Cart Items INSTANTLY from the cart snapshot
+    if (cart.items && cart.items.length > 0) {
+      cartItems = [];
+      for (const item of cart.items) {
+        const p = (allProducts || []).find(x => String(x._id) === String(item.productId)) || {
+          _id: item.productId,
+          name: item.name || 'منتج',
+          imageUrl: item.imageUrl || '',
+          basePrice: item.basePrice || item.unitPrice || 0,
+          salePrice: item.salePrice || null,
+          variants: []
+        };
+        cartItems.push({
+          product: p,
+          quantity: item.quantity || 1,
+          selectedOptions: item.selectedOptions || [],
+          discount: item.discount || 0,
+          price: (item.unitPrice !== undefined && item.unitPrice !== null) ? item.unitPrice : (item.basePrice || p.basePrice || 0)
+        });
+      }
+      renderCart();
+    }
+
+    recalcSummary();
+
+    // Set customer mode to 'new' since this is recovered data and not a selected existing customer profile
+    const radioNew = document.querySelector('input[name="customer_type"][value="new"]');
+    if (radioNew) {
+      radioNew.checked = true;
+    }
+    const existingSection = document.getElementById('existing-customer-section');
+    if (existingSection) {
+      existingSection.style.display = 'none';
+    }
+    const fields = document.getElementById('customer-fields');
+    if (fields) {
+      fields.style.display = 'block';
+    }
+
+    // Automatically trigger the "Unsaved Changes" bar/alert
+    if (window.markAsModified) {
+      window.markAsModified();
+    }
+
+    // Release loading screen immediately so the UI is responsive in < 300ms!
+    document.body.classList.remove('is-loading');
+    showToast('تم استعادة بيانات السلة المتروكة بنجاح');
+
+    // 4. Background: Match Governorate & Shipping accurately as soon as shipping data arrives
+    (async () => {
+      if (!window._fullShippingData || window._fullShippingData.length === 0) {
+        if (window._shippingPromise) {
+          await window._shippingPromise;
+        } else {
+          window._fullShippingData = await api.getShippingList().catch(() => []);
+        }
+      }
+
+      const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+      if (!shippingList.length || !cart.customer) return;
+
+      const rawGov = (cart.customer.government || cart.customer.city || cart.customer.addressCity || '').trim();
+
+      const normalizeArabic = (str) => {
+        if (!str) return '';
+        return str.toString()
+          .replace(/[أإآا]/g, 'ا')
+          .replace(/ة/g, 'ه')
+          .replace(/ى/g, 'ي')
+          .replace(/[\u064B-\u065F]/g, '')
+          .replace(/\s+/g, '')
+          .toLowerCase()
+          .trim();
+      };
+
+      const isMatch = (cityName, query) => {
+        if (!cityName || !query) return false;
+        const a = normalizeArabic(cityName);
+        const b = normalizeArabic(query);
+        return a === b || a.includes(b) || b.includes(a);
+      };
+
+      let matchedCity = null;
+      if (rawGov) {
+        matchedCity = shippingList.find(x => String(x._id) === String(rawGov)) ||
+          shippingList.find(x => normalizeArabic(x.city) === normalizeArabic(rawGov) || normalizeArabic(x.cityOtherName) === normalizeArabic(rawGov)) ||
+          shippingList.find(x => isMatch(x.city, rawGov) || isMatch(x.cityOtherName, rawGov));
+      }
+
+      if (!matchedCity && cart.customer.address) {
+        matchedCity = shippingList.find(x => isMatch(cart.customer.address, x.city) || isMatch(cart.customer.address, x.cityOtherName));
+      }
+
+      if (matchedCity) {
+        const cityDisplayName = matchedCity.cityOtherName || matchedCity.city;
+        if (typeof window.selectGov === 'function') {
+          window.selectGov(matchedCity._id, cityDisplayName);
+        } else {
+          const govInput = document.getElementById('c-gov');
+          const searchInput = document.getElementById('c-gov-search');
+          if (govInput) govInput.value = matchedCity._id;
+          if (searchInput) searchInput.value = cityDisplayName;
+          await handleCityChange();
+        }
+      }
+
+      // If products load, enrich product objects with fresh active data
+      if (window._productsPromise) {
+        await window._productsPromise;
+        let changed = false;
+        cartItems.forEach(ci => {
+          const fullP = (allProducts || []).find(p => String(p._id) === String(ci.product._id));
+          if (fullP && ci.product !== fullP) {
+            ci.product = fullP;
+            changed = true;
+          }
+        });
+        if (changed) renderCart();
+      }
+    })();
+  } catch (err) {
+    document.body.classList.remove('is-loading');
+    console.error('Error recovering abandoned cart:', err);
+    showToast('حدث خطأ أثناء استعادة السلة المتروكة', 'error');
+  }
+}
+
 // ── Products Modal ─────────────────────────────────────
-let collectionsMap = {};
 window.openModal = function (modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+  if (modal) {
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
 };
 
 window.closeModal = function (modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.style.display = 'none';
+  if (modal) {
+    modal.style.display = 'none';
+  }
   const openModals = document.querySelectorAll('.modal-overlay[style*="display: flex"]');
   if (openModals.length === 0) {
     document.body.style.overflow = '';
   }
 };
 
+// ── Modal Products (Persistent Selection) ───────────────
+let modalSelectedProducts = new Set(); // Stores product IDs
+let modalSelectedVariants = new Map(); // Key: pid-comboStr, Value: {pid, combo, price}
+
 window.openProductsModal = async function () {
+  modalSelectedProducts.clear();
+  modalSelectedVariants.clear();
   openModal('products-modal');
 
   if (allProducts.length === 0) {
     const listEl = document.getElementById('modal-products-list');
     if (listEl) listEl.innerHTML = '<div style="padding:20px; text-align:center;">جاري تحميل المنتجات...</div>';
     try {
-      const [productsRes, collections] = await Promise.all([
-        api.getProducts(1, 1000, true).catch(() => []),
-        api.getCollections()
-      ]);
+      const productsRes = await api.getProducts(1, 1000, true, '', '', '', '', true).catch(() => []);
       allProducts = (productsRes.products || productsRes).filter(p => p.status !== 'draft');
-      const colFilter = document.getElementById('modal-col-filter');
-      if (colFilter) {
-        colFilter.innerHTML = '<option value="">جميع المنتجات</option>';
-        collections.forEach(c => {
-          collectionsMap[c._id] = c.name;
-          colFilter.add(new Option(c.name, c._id));
-        });
-      }
     } catch (err) {
       console.error('Failed to load products for modal', err);
     }
@@ -166,6 +483,20 @@ window.toggleProductVariants = function (pid) {
   } else {
     el.style.display = 'none';
     icon.style.transform = 'rotate(0deg)';
+  }
+};
+
+window.handleModalSelect = function(pid, checked) {
+  if (checked) modalSelectedProducts.add(pid);
+  else modalSelectedProducts.delete(pid);
+};
+
+window.handleModalVariantSelect = function(pid, comboStr, price, checked) {
+  const key = `${pid}-${comboStr}`;
+  if (checked) {
+    modalSelectedVariants.set(key, { pid, combo: JSON.parse(decodeURIComponent(comboStr)), price });
+  } else {
+    modalSelectedVariants.delete(key);
   }
 };
 
@@ -194,8 +525,18 @@ window.renderModalProducts = function () {
   const q = qEl ? qEl.value.toLowerCase().trim() : '';
   const col = colEl ? colEl.value : '';
 
-  let filtered = allProducts;
-  if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
+  let filtered = (Array.isArray(allProducts) ? allProducts : (allProducts.products || []))
+    .filter(p => p.status !== 'draft');
+
+  // Filter by stock
+  filtered = filtered.filter(p => {
+    if (p.variants && p.variants.length > 0) {
+      return p.variants.some(v => v.quantity === null || v.quantity > 0);
+    }
+    return p.quantity === null || p.quantity > 0;
+  });
+
+  if (q) filtered = filtered.filter(p => smartMatch(p.name, q));
   if (col) filtered = filtered.filter(p => p.collectionId === col || (p.collectionIds && p.collectionIds.includes(col)));
 
   if (!filtered.length) {
@@ -204,8 +545,9 @@ window.renderModalProducts = function () {
   }
 
   listEl.innerHTML = filtered.map(p => {
+    const isChecked = modalSelectedProducts.has(p._id);
     const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || '');
-    const imgHtml = imgUrl ? `<img src="${imgUrl}" class="pli-img">` : `<div class="pli-img"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div>`;
+    const imgHtml = imgUrl ? `<img src="${imgUrl}" class="pli-img" loading="lazy">` : `<div class="pli-img"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div>`;
     const hasOptions = p.options && p.options.length > 0;
     const effectiveBase = (p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice;
 
@@ -220,7 +562,10 @@ window.renderModalProducts = function () {
                 <div style="font-size:0.85rem;color:var(--primary)">${formatPrice(effectiveBase)}</div>
               </div>
             </div>
-            <input type="checkbox" class="pli-checkbox product-select-cb" value="${p._id}" style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
+            <input type="checkbox" class="pli-checkbox product-select-cb" value="${p._id}" 
+              ${isChecked ? 'checked' : ''}
+              onchange="handleModalSelect('${p._id}', this.checked)"
+              style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
           </label>
         </div>
       `;
@@ -228,35 +573,46 @@ window.renderModalProducts = function () {
 
     let variantsHtml = '';
     if (p.variants && p.variants.length > 0) {
-      variantsHtml = p.variants.map((v, idx) => {
-        const comboList = Object.entries(v.combination).map(([g, l]) => ({ groupName: g, label: l }));
-        const title = comboList.map(c => c.label).join(' / ');
-        const finalPrice = (v.salePrice !== null && v.salePrice !== undefined) ? v.salePrice : v.price;
-        const comboStr = encodeURIComponent(JSON.stringify(comboList));
-        return `
-          <label class="product-variant-item" style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-color); background:#fafafa; cursor:pointer; padding-right:48px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <div style="font-size:0.9rem;font-weight:500;">${title}</div>
-              <div style="font-size:0.85rem;color:var(--primary)">${formatPrice(finalPrice)}</div>
-            </div>
-            <input type="checkbox" class="pli-checkbox product-variant-cb" data-pid="${p._id}" data-combo="${comboStr}">
-          </label>
-        `;
-      }).join('');
+      variantsHtml = p.variants
+        .filter(v => v.quantity === null || v.quantity > 0)
+        .map((v, idx) => {
+          const comboList = Object.entries(v.combination).map(([g, l]) => ({ groupName: g, label: l }));
+          const title = comboList.map(c => c.label).join(' / ');
+          const finalPrice = (v.salePrice !== null && v.salePrice !== undefined) ? v.salePrice : v.price;
+          const comboStr = encodeURIComponent(JSON.stringify(comboList));
+          const vKey = `${p._id}-${comboStr}`;
+          return `
+            <label class="product-variant-item" style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-color); background:#fafafa; cursor:pointer; padding-right:48px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="font-size:0.9rem;font-weight:500;">${title}</div>
+                <div style="font-size:0.85rem;color:var(--primary)">${formatPrice(finalPrice)}</div>
+              </div>
+              <input type="checkbox" class="pli-checkbox product-variant-cb" 
+                data-pid="${p._id}" data-combo="${comboStr}" data-price="${finalPrice}"
+                ${modalSelectedVariants.has(vKey) ? 'checked' : ''}
+                onchange="handleModalVariantSelect('${p._id}', '${comboStr}', ${finalPrice}, this.checked)">
+            </label>
+          `;
+        }).join('');
     } else {
       const combinations = getProductCombinations(p.options);
       variantsHtml = combinations.map((combo, idx) => {
         const title = combo.map(c => c.label).join(' / ');
-        const extraPrice = combo.reduce((sum, c) => sum + (c.price || 0), 0);
-        const finalPrice = extraPrice > 0 ? extraPrice : effectiveBase;
+        const optionsPriceTotal = combo.reduce((sum, c) => sum + (c.price || 0), 0);
+        // Matching storefront logic: options prices REPLACE base price if no variants
+        const finalPrice = optionsPriceTotal > 0 ? optionsPriceTotal : effectiveBase;
         const comboStr = encodeURIComponent(JSON.stringify(combo));
+        const vKey = `${p._id}-${comboStr}`;
         return `
           <label class="product-variant-item" style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-color); background:#fafafa; cursor:pointer; padding-right:48px;">
             <div style="display:flex; align-items:center; gap:12px;">
               <div style="font-size:0.9rem;font-weight:500;">${title}</div>
               <div style="font-size:0.85rem;color:var(--primary)">${formatPrice(finalPrice)}</div>
             </div>
-            <input type="checkbox" class="pli-checkbox product-variant-cb" data-pid="${p._id}" data-combo="${comboStr}">
+            <input type="checkbox" class="pli-checkbox product-variant-cb" 
+              data-pid="${p._id}" data-combo="${comboStr}" data-price="${finalPrice}"
+              ${modalSelectedVariants.has(vKey) ? 'checked' : ''}
+              onchange="handleModalVariantSelect('${p._id}', '${comboStr}', ${finalPrice}, this.checked)">
           </label>
         `;
       }).join('');
@@ -280,20 +636,17 @@ window.renderModalProducts = function () {
     `;
   }).join('');
 };
+window.renderProductsModal = window.renderModalProducts;
 
 window.addSelectedProducts = function () {
-  const checkedSimple = document.querySelectorAll('.product-select-cb:checked');
-  const checkedVariants = document.querySelectorAll('.product-variant-cb:checked');
-
-  if (checkedSimple.length === 0 && checkedVariants.length === 0) {
+  if (modalSelectedProducts.size === 0 && modalSelectedVariants.size === 0) {
     return showToast('اختر منتجاً واحداً على الأقل', 'error');
   }
 
   // 1. Add simple products
-  checkedSimple.forEach(cb => {
-    const p = allProducts.find(x => x._id === cb.value);
+  modalSelectedProducts.forEach(pid => {
+    const p = allProducts.find(x => x._id === pid);
     if (p) {
-      const effectiveBase = (p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice;
       const existing = cartItems.find(c => c.product._id === p._id && (!c.selectedOptions || c.selectedOptions.length === 0));
       if (existing) {
         existing.quantity++;
@@ -304,18 +657,14 @@ window.addSelectedProducts = function () {
   });
 
   // 2. Add variants
-  checkedVariants.forEach(cb => {
-    const p = allProducts.find(x => x._id === cb.dataset.pid);
+  modalSelectedVariants.forEach(data => {
+    const p = allProducts.find(x => x._id === data.pid);
     if (p) {
-      const effectiveBase = (p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice;
-      const combo = JSON.parse(decodeURIComponent(cb.dataset.combo));
-      const extraPrice = combo.reduce((sum, c) => sum + (c.price || 0), 0);
-      const finalPrice = effectiveBase + extraPrice;
-
+      const combo = data.combo;
+      const variantPrice = data.price;
       const existing = cartItems.find(c => {
         if (c.product._id !== p._id) return false;
         if (!c.selectedOptions || c.selectedOptions.length !== combo.length) return false;
-        // Check if options match
         return combo.every(cv => c.selectedOptions.some(so => so.groupName === cv.groupName && so.label === cv.label));
       });
 
@@ -327,16 +676,27 @@ window.addSelectedProducts = function () {
           quantity: 1,
           selectedOptions: combo,
           discount: 0,
-          price: finalPrice
+          price: variantPrice
         });
       }
     }
   });
 
-  closeProductsModal();
   renderCart();
+  closeProductsModal();
   if (window.markAsModified) window.markAsModified();
 };
+
+function getAvailableQty(p, selectedOptions = []) {
+  if (selectedOptions.length > 0 && p.variants && p.variants.length > 0) {
+    const v = p.variants.find(v => {
+      return selectedOptions.every(so => v.combination[so.groupName] === so.label);
+    });
+    return (v && v.quantity !== null && v.quantity !== undefined) ? v.quantity : Infinity;
+  }
+  return (p.quantity !== null && p.quantity !== undefined) ? p.quantity : Infinity;
+}
+
 
 
 window.removeCartItem = function (index) {
@@ -358,19 +718,46 @@ window.updateItemQty = function (idx, val) {
 window.openItemDiscountModal = function (idx) {
   const item = cartItems[idx];
   document.getElementById('modal-item-idx').value = idx;
-  document.getElementById('modal-item-discount').value = item.discount || 0;
+  document.getElementById('modal-item-discount').value = item.discount || '';
+  previewItemDiscount();
   openModal('item-discount-modal');
 };
 
-window.applyItemDiscount = function () {
+window.previewItemDiscount = function () {
+  const val = parseFloat(document.getElementById('modal-item-discount').value) || 0;
+  const preview = document.getElementById('discount-preview');
+  
+  if (val === 0 || isNaN(val)) {
+    preview.style.display = 'none';
+    return;
+  }
+  
+  preview.style.display = 'block';
+  if (val > 0) {
+    preview.textContent = `خصم: ${val.toLocaleString('ar-EG')} ج.م`;
+    preview.style.color = '#dc2626';
+  } else {
+    preview.textContent = `زياده: ${Math.abs(val).toLocaleString('ar-EG')} ج.م`;
+    preview.style.color = '#10b981';
+  }
+};
+
+window.applyItemDiscount = function (type) {
   const idx = parseInt(document.getElementById('modal-item-idx').value);
-  const val = document.getElementById('modal-item-discount').value;
+  const val = parseFloat(document.getElementById('modal-item-discount').value) || 0;
   const item = cartItems[idx];
   if (item) {
-    item.discount = parseFloat(val) || 0;
+    if (type === 'discount') {
+      // خصم: store as positive value (will be subtracted)
+      item.discount = val;
+    } else if (type === 'increase') {
+      // زياده: store as negative value (will be added)
+      item.discount = -val;
+    }
     closeModal('item-discount-modal');
     recalcSummary();
     renderCart();
+    if (window.markAsModified) window.markAsModified();
   }
 };
 
@@ -410,11 +797,14 @@ function renderCart() {
     }
 
     const imgHtml = finalImageUrl
-      ? `<img src="${finalImageUrl}" style="width:52px; height:52px; border-radius:8px; object-fit:contain; border:1px solid #f1f5f9;" alt="${p.name}">`
+      ? `<img src="${finalImageUrl}" style="width:52px; height:52px; border-radius:8px; object-fit:contain; border:1px solid #f1f5f9;" alt="${p.name}" loading="lazy">`
       : `<div style="width:52px; height:52px; border-radius:8px; background:#f8fafc; display:flex; align-items:center; justify-content:center; color:#94a3b8; border:1px solid #f1f5f9;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div>`;
 
     const optText = (c.selectedOptions || []).map(op => op.label).join(' / ');
     const effectiveUnitPrice = c.price !== undefined ? c.price : ((p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice);
+    
+    const available = getAvailableQty(p, c.selectedOptions);
+    const lowStock = available !== Infinity && c.quantity > available;
 
     return `
       <div style="padding: 16px 20px; border-bottom: 1px solid #f1f5f9; background: #fff; display: flex; flex-direction: column; gap: 14px;">
@@ -426,13 +816,17 @@ function renderCart() {
             <div style="text-align: right; display: flex; flex-direction: column; justify-content: center; min-width: 0;">
               <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b; line-height: 1.2; word-break: break-word;">${p.name}</div>
               ${optText ? `<div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${optText}</div>` : ''}
-              ${c.discount ? `<div style="font-size:0.75rem; color:#dc2626; margin-top:4px; font-weight:600;">خصم: ${formatPrice(c.discount)}</div>` : ''}
+              ${c.discount ? (c.discount > 0 
+                ? `<div style="font-size:0.75rem; color:#dc2626; margin-top:4px; font-weight:600;">خصم: ${formatPrice(c.discount)}</div>` 
+                : `<div style="font-size:0.75rem; color:#10b981; margin-top:4px; font-weight:600;">زياده ${Math.abs(c.discount)} ج.م</div>`
+              ) : ''}
+              ${lowStock ? `<div style="font-size:0.75rem; color:#b45309; margin-top:4px; font-weight:600; background:#fef3c7; padding:2px; border-radius:4px; display:inline-block;">الباقي : ${available} قطعة</div>` : ''}
             </div>
           </div>
           
           <!-- Left side: Unit Price Block and Total Price -->
           <div style="display: flex; align-items: center; gap: 16px; flex: 1; justify-content: space-between;">
-            <div style="font-size: 0.85rem; color: #64748b; white-space: nowrap; font-weight: 500; text-align: center; flex: 1;" dir="ltr">${formatPrice(effectiveUnitPrice)} × ${c.quantity}</div>
+            <div style="font-size: 0.85rem; color: #64748b; white-space: nowrap; font-weight: 500; text-align: center; flex: 1;" dir="ltr">${c.quantity} x ${formatPrice(effectiveUnitPrice)}</div>
             <div style="font-weight: 700; font-size: 1rem; color: #1e293b; min-width: 80px; text-align: left; flex: 1;">${formatPrice(itemTotal(c))}</div>
           </div>
         </div>
@@ -467,11 +861,26 @@ function itemTotal(c) {
   return Math.max(0, effectiveUnitPrice * c.quantity - (c.discount || 0));
 }
 
+window.handleCityChange = async function() {
+  window.handleCarrierChange();
+};
+
+window.handleCarrierChange = function() {
+  recalcSummary();
+};
+
 window.recalcSummary = function () {
   let subtotal = 0;
   cartItems.forEach(c => subtotal += itemTotal(c));
-  const gov = document.getElementById('c-gov').value;
-  const shipping = shippingMap[gov] || 0;
+  const cityId = document.getElementById('c-gov')?.value || '';
+  const searchCityName = document.getElementById('c-gov-search')?.value.trim() || '';
+  const data = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
+  const cityName = data ? (data.cityOtherName || data.city) : searchCityName;
+
+  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
+  const shipDetails = resolveShippingDetails(cityName, carrierVal);
+  const shipping = shipDetails.fee;
+
   const orderDiscount = parseFloat(document.getElementById('order-discount').value) || 0;
   const total = Math.max(0, subtotal + shipping - orderDiscount);
   document.getElementById('sum-subtotal').textContent = formatPrice(subtotal);
@@ -487,16 +896,37 @@ window.updatePaymentUI = function () {
 
 window.submitOrder = async function () {
   if (cartItems.length === 0) return showToast('أضف منتجاً واحداً على الأقل', 'error');
-  const name = document.getElementById('c-name').value.trim();
-  const phone = document.getElementById('c-phone').value.trim();
-  const address = document.getElementById('c-address').value.trim();
-  const gov = document.getElementById('c-gov').value;
-  if (!name || !phone || !address || !gov) return showToast('يرجى ملء جميع الحقول المطلوبة للعميل', 'error');
+  const name = document.getElementById('c-name')?.value.trim() || '';
+  const phone = document.getElementById('c-phone')?.value.trim() || '';
+  const address = document.getElementById('c-address')?.value.trim() || '';
+  const cityId = document.getElementById('c-gov')?.value || '';
+  
+  const govData = (window._fullShippingData || []).find(s => s._id === cityId || s.city === cityId || s.cityOtherName === cityId);
+  const cityName = govData ? (govData.cityOtherName || govData.city) : (document.getElementById('c-gov-search')?.value.trim() || '');
+
+
+  // Arabic-only name validation
+  if (!/^[\u0600-\u06FF\s]+$/.test(name)) {
+    return showToast('يرجى إدخال اسم العميل باللغة العربية فقط', 'error');
+  }
+
+  // English-only phone validation (digits)
+  if (!/^[0-9+]+$/.test(phone)) {
+    return showToast('يرجى إدخال رقم الهاتف بالأرقام الإنجليزية فقط', 'error');
+  }
+
+  // Resolve carrier first
+  const carrierVal = document.getElementById('c-carrier')?.value || 'egyptpost';
+  const shipDetails = resolveShippingDetails(cityName, carrierVal);
+  const carrier = shipDetails.carrier;
+  const shippingFee = shipDetails.fee;
+
+  if (!name || !phone || !address || !cityName) return showToast('يرجى ملء جميع الحقول المطلوبة للعميل', 'error');
 
   const btn = document.getElementById('submit-btn');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'جارٍ الحفظ...';
+    btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2.5px;margin:0;"></span> جارٍ الحفظ...';
   }
 
   const finalItems = cartItems.map(c => {
@@ -525,25 +955,40 @@ window.submitOrder = async function () {
   });
 
   const payload = {
-    customer: { name, phone, secondPhone: document.getElementById('c-second-phone').value.trim(), address, government: gov, notes: document.getElementById('c-notes').value.trim() },
+    customer: { 
+      name, 
+      phone, 
+      secondPhone: document.getElementById('c-second-phone')?.value.trim() || '', 
+      address, 
+      government: cityName, 
+      notes: document.getElementById('c-notes')?.value.trim() || '' 
+    },
     items: finalItems,
     discount: parseFloat(document.getElementById('order-discount').value) || 0,
     paymentMethod: document.querySelector('input[name="payment"]:checked').value,
-    paidAmount: Math.max(0, parseFloat(document.getElementById('paid-amount').value) || 0)
+    paidAmount: Math.max(0, parseFloat(document.getElementById('paid-amount').value) || 0),
+    shippingFee: shippingFee,
+    carrier: carrier
   };
 
   try {
-    await api.createOrder(payload);
+    const res = await api.createOrder(payload);
     showToast('تم إنشاء الطلب بنجاح!');
     
-    // Reset form instead of redirecting
-    cartItems = [];
-    renderCart();
-    const fields = ['c-name', 'c-phone', 'c-second-phone', 'c-gov', 'c-address', 'c-notes', 'order-discount', 'paid-amount'];
-    fields.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = (id === 'order-discount' ? '0' : '');
-    });
+    // If the order was created from a recovered abandoned cart, delete the abandoned cart from the database
+    const params = new URLSearchParams(window.location.search);
+    const recoverCartId = params.get('recoverCartId');
+    if (recoverCartId) {
+      try {
+        await api.deleteAbandonedCart(recoverCartId);
+      } catch (deleteErr) {
+        console.error('Failed to delete abandoned cart after recovery:', deleteErr);
+      }
+    }
+
+    if (res && res.orderId) {
+      setTimeout(() => window.location.href = `order-details.html?id=${res.orderId}`, 1000);
+    }
     updatePaymentUI();
     recalcSummary();
     if (window.hideBar) window.hideBar();
@@ -561,20 +1006,277 @@ window.submitOrder = async function () {
   }
 };
 
+
+window.handleSearchClick = function () {
+  const input = document.getElementById('customer-search');
+  const display = document.getElementById('selected-customer-display');
+  const dropdown = document.getElementById('customer-dropdown');
+  
+  if (display && display.classList.contains('active')) {
+    // If already selected, just toggle dropdown
+    dropdown.classList.toggle('active');
+    if (dropdown.classList.contains('active') && allCustomers.length > 0) {
+      renderCustomerDropdown(allCustomers);
+    }
+  } else {
+    input.focus();
+  }
+};
+
+window.setupCustomerSearch = function () {
+  const input = document.getElementById('customer-search');
+  const dropdown = document.getElementById('customer-dropdown');
+  if (!input || !dropdown) return;
+
+  input.addEventListener('focus', () => {
+    if (allCustomers.length > 0) {
+      renderCustomerDropdown(allCustomers);
+      dropdown.classList.add('active');
+    }
+  });
+
+  const debouncedCustomerSearch = debounce((q) => {
+    // Reset selected state if user types
+    resetCustomerSelectionUI();
+
+    if (!q) {
+      renderCustomerDropdown(allCustomers);
+      return;
+    }
+    const filtered = allCustomers.filter(c => 
+      (c.name && smartMatch(c.name, q)) || 
+      (c.phone && c.phone.includes(q))
+    );
+    renderCustomerDropdown(filtered);
+    dropdown.classList.add('active');
+  }, 300);
+
+  input.addEventListener('input', (e) => {
+    debouncedCustomerSearch(e.target.value.toLowerCase().trim());
+  });
+
+  document.addEventListener('click', (e) => {
+    const container = document.getElementById('customer-search-container');
+    if (container && !container.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('active');
+    }
+  });
+};
+
+function resetCustomerSelectionUI() {
+  const input = document.getElementById('customer-search');
+  const icon = document.getElementById('customer-search-icon');
+  const display = document.getElementById('selected-customer-display');
+  const nameField = document.getElementById('c-name');
+
+  if (display && display.classList.contains('active')) {
+    display.classList.remove('active');
+    if (input) input.style.display = 'block';
+    if (icon) icon.style.display = 'block';
+    
+    // Clear fields
+    if (nameField) {
+      nameField.value = '';
+      nameField.readOnly = false;
+      const phoneEl = document.getElementById('c-phone');
+      if (phoneEl) {
+        phoneEl.value = '';
+        phoneEl.readOnly = false;
+      }
+      const secondPhoneEl = document.getElementById('c-second-phone');
+      if (secondPhoneEl) secondPhoneEl.value = '';
+      const addressEl = document.getElementById('c-address');
+      if (addressEl) addressEl.value = '';
+      const govEl = document.getElementById('c-gov');
+      if (govEl) govEl.value = '';
+      const govSearch = document.getElementById('c-gov-search');
+      if (govSearch) govSearch.value = '';
+    }
+
+    // Hide customer fields again in existing customer mode
+    const fields = document.getElementById('customer-fields');
+    const mode = document.querySelector('input[name="customer_type"]:checked')?.value;
+    if (fields && mode === 'existing') fields.style.display = 'none';
+  }
+}
+
+function renderCustomerDropdown(customers) {
+  const dropdown = document.getElementById('customer-dropdown');
+  if (!dropdown) return;
+
+  if (customers.length === 0) {
+    dropdown.innerHTML = '<div style="padding:16px; text-align:center; color:#64748b; font-size:0.9rem;">لا يوجد عملاء بهذا الاسم</div>';
+    return;
+  }
+
+  dropdown.innerHTML = customers.map(c => {
+    const initials = c.name ? c.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
+    return `
+      <div class="customer-item" onclick="selectCustomer('${c.phone}')">
+        <div class="customer-avatar">${initials}</div>
+        <div class="customer-info-row">
+          <div class="customer-name-row">${c.name || 'بدون اسم'}</div>
+          <div class="customer-phone-row">+${c.phone}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.selectCustomer = async function (phone) {
+  if (window._shippingPromise && (!window._fullShippingData || window._fullShippingData.length === 0)) {
+    try {
+      await window._shippingPromise;
+    } catch (_) {}
+  }
+
+  const customer = allCustomers.find(c => String(c.phone).trim() === String(phone).trim());
+  if (!customer) return;
+
+  const nameEl = document.getElementById('c-name');
+  if (nameEl) nameEl.value = customer.name || '';
+  const phoneEl = document.getElementById('c-phone');
+  if (phoneEl) phoneEl.value = customer.phone || '';
+  const secondPhoneEl = document.getElementById('c-second-phone');
+  if (secondPhoneEl) secondPhoneEl.value = customer.secondPhone || '';
+  
+  // Map government name to ID or match by normalized name
+  const govName = (customer.government || '').trim();
+  const normalizeCity = (s) => (s || '')
+    .replace(/[أإآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/^ال/, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+    .trim();
+
+  const normGov = normalizeCity(govName);
+  const govData = (window._fullShippingData || []).find(s => 
+    s._id === govName ||
+    s.city === govName || 
+    s.cityOtherName === govName ||
+    (normGov && (normalizeCity(s.city) === normGov || normalizeCity(s.cityOtherName) === normGov))
+  );
+
+  const govEl = document.getElementById('c-gov');
+  if (govEl) govEl.value = govData ? govData._id : '';
+  const searchInput = document.getElementById('c-gov-search');
+  if (searchInput) {
+    searchInput.value = govData ? (govData.cityOtherName || govData.city) : govName;
+  }
+
+  await handleCityChange();
+  const addressEl = document.getElementById('c-address');
+  if (addressEl) addressEl.value = customer.address || '';
+  
+  const searchInputCust = document.getElementById('customer-search');
+  if (searchInputCust) searchInputCust.value = customer.name || customer.phone;
+  const custDropdown = document.getElementById('customer-dropdown');
+  if (custDropdown) custDropdown.classList.remove('active');
+  
+  // Update UI to "selected" state
+  const input = document.getElementById('customer-search');
+  const icon = document.getElementById('customer-search-icon');
+  const display = document.getElementById('selected-customer-display');
+  const sAvatar = document.getElementById('selected-avatar');
+  const sName = document.getElementById('selected-name');
+  const sPhone = document.getElementById('selected-phone');
+
+  if (display) {
+    const initials = customer.name ? customer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
+    if (sAvatar) sAvatar.textContent = initials;
+    if (sName) sName.textContent = customer.name || 'بدون اسم';
+    if (sPhone) sPhone.textContent = '+' + customer.phone;
+    
+    display.classList.add('active');
+    if (input) input.style.display = 'none';
+    if (icon) icon.style.display = 'none';
+  }
+
+  // Display all the input fields populated with data
+  const fields = document.getElementById('customer-fields');
+  if (fields) fields.style.display = 'block';
+
+  // Disable editing of primary info for selected customers
+  if (nameEl) nameEl.readOnly = false;
+  if (phoneEl) phoneEl.readOnly = false;
+  
+  if (window.recalcSummary) recalcSummary();
+  if (window.markAsModified) window.markAsModified();
+};
+
+window.toggleCustomerMode = function (autoExpand = true) {
+  const mode = document.querySelector('input[name="customer_type"]:checked')?.value;
+  const existingSection = document.getElementById('existing-customer-section');
+  const fields = document.getElementById('customer-fields');
+  
+  if (mode === 'new') {
+    if (existingSection) existingSection.style.display = 'none';
+    if (fields) fields.style.display = 'block';
+    // Clear fields
+    const nameEl = document.getElementById('c-name');
+    if (nameEl) nameEl.value = '';
+    const phoneEl = document.getElementById('c-phone');
+    if (phoneEl) phoneEl.value = '';
+    const secondPhoneEl = document.getElementById('c-second-phone');
+    if (secondPhoneEl) secondPhoneEl.value = '';
+    const addressEl = document.getElementById('c-address');
+    if (addressEl) addressEl.value = '';
+    const govEl = document.getElementById('c-gov');
+    if (govEl) govEl.value = '';
+    const govSearch = document.getElementById('c-gov-search');
+    if (govSearch) govSearch.value = '';
+    const custSearch = document.getElementById('customer-search');
+    if (custSearch) custSearch.value = '';
+    
+    // Reset selected UI
+    resetCustomerSelectionUI();
+  } else {
+    if (existingSection) existingSection.style.display = 'block';
+    
+    // In existing customer mode, hide the input fields until a customer is chosen
+    const display = document.getElementById('selected-customer-display');
+    const isSelected = display && display.classList.contains('active');
+    if (fields) {
+      fields.style.display = isSelected ? 'block' : 'none';
+    }
+    
+    if (autoExpand) {
+      // Proactively expand/show the customer dropdown list and focus the input when Exist Customer is selected!
+      const dropdown = document.getElementById('customer-dropdown');
+      const input = document.getElementById('customer-search');
+      if (dropdown && allCustomers.length > 0) {
+        renderCustomerDropdown(allCustomers);
+        dropdown.classList.add('active');
+        if (input) {
+          setTimeout(() => {
+            input.focus();
+          }, 50);
+        }
+      }
+    }
+  }
+};
+
 window.setupSearch = function () {
   const input = document.getElementById('product-search-input');
   if (!input) return;
-  input.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase().trim();
+  const debouncedProductSearch = debounce((q) => {
     const results = document.getElementById('search-results');
     if (q.length < 2) { results.innerHTML = ''; return; }
-    const filtered = allProducts.filter(p => p.name.toLowerCase().includes(q));
+    const products = Array.isArray(allProducts) ? allProducts : [];
+    const filtered = products.filter(p => smartMatch(p.name, q));
     results.innerHTML = filtered.map(p => `
       <div class="search-item" onclick="addToCart('${p._id}')">
         <div style="font-weight:600">${p.name}</div>
         <div style="font-size:0.85rem;color:var(--text-muted)">${formatPrice(p.salePrice || p.basePrice)}</div>
       </div>
     `).join('');
+  }, 300);
+
+  input.addEventListener('input', (e) => {
+    debouncedProductSearch(e.target.value.toLowerCase().trim());
   });
 };
 

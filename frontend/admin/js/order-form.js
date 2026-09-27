@@ -30,6 +30,7 @@ function smartMatch(text, query) {
 
 let allProducts = [];
 let allCustomers = [];
+let collectionsMap = {};
 let shippingMap = {};
 let cartItems = []; // [{ product, quantity, selectedOptions, discount }]
 
@@ -83,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const [settings, shippingOptionsRes, collectionsRes] = await Promise.all([
-      api.getSetting('sundura_global_settings').catch(() => ({})),
+      api.getSetting('loli_global_settings').catch(() => api.getSetting('sundura_global_settings')).catch(() => ({})),
       api.getSetting('shipping_options').catch(() => []),
       api.getCollections().catch(() => [])
     ]);
@@ -95,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const colFilter = document.getElementById('modal-col-filter');
     if (colFilter) {
       colFilter.innerHTML = '<option value="">جميع المنتجات</option>';
-      collectionsRes.forEach(c => {
+      (collectionsRes || []).forEach(c => {
         collectionsMap[c._id] = c.name;
         colFilter.add(new Option(c.name, c._id));
       });
@@ -103,9 +104,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Parallel non-blocking background fetch
     window._shippingPromise = api.getShippingList().then(shippingRes => {
-      window._fullShippingData = shippingRes;
-      return shippingRes;
-    }).catch(() => []);
+      window._fullShippingData = shippingRes || [];
+      return shippingRes || [];
+    }).catch(() => {
+      window._fullShippingData = [];
+      return [];
+    });
 
     window._productsPromise = api.getProducts(1, 1000, true).then(productsRes => {
       const products = (productsRes.products || productsRes || []).filter(p => p.status !== 'draft');
@@ -147,7 +151,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function renderGovDropdown() {
           const query = searchInput.value.trim();
-          const filtered = window._fullShippingData.filter(s => 
+          const shippingList = window._fullShippingData || [];
+          const filtered = shippingList.filter(s => 
             smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
           );
 
@@ -192,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     document.body.classList.remove('is-loading');
   } catch (err) {
+    console.error('Failed to load store data:', err);
     showToast('فشل تحميل بيانات المتجر', 'error');
     document.body.classList.remove('is-loading');
   }
@@ -422,7 +428,6 @@ async function recoverAbandonedCart(cartId, preloadedCartPromise) {
 }
 
 // ── Products Modal ─────────────────────────────────────
-let collectionsMap = {};
 window.openModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
@@ -1119,7 +1124,13 @@ function renderCustomerDropdown(customers) {
 }
 
 window.selectCustomer = async function (phone) {
-  const customer = allCustomers.find(c => c.phone === phone);
+  if (window._shippingPromise && (!window._fullShippingData || window._fullShippingData.length === 0)) {
+    try {
+      await window._shippingPromise;
+    } catch (_) {}
+  }
+
+  const customer = allCustomers.find(c => String(c.phone).trim() === String(phone).trim());
   if (!customer) return;
 
   const nameEl = document.getElementById('c-name');
@@ -1129,14 +1140,30 @@ window.selectCustomer = async function (phone) {
   const secondPhoneEl = document.getElementById('c-second-phone');
   if (secondPhoneEl) secondPhoneEl.value = customer.secondPhone || '';
   
-  // Map government name to ID
-  const govName = customer.government || '';
-  const govData = (window._fullShippingData || []).find(s => s.city === govName || s.cityOtherName === govName);
+  // Map government name to ID or match by normalized name
+  const govName = (customer.government || '').trim();
+  const normalizeCity = (s) => (s || '')
+    .replace(/[أإآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/^ال/, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+    .trim();
+
+  const normGov = normalizeCity(govName);
+  const govData = (window._fullShippingData || []).find(s => 
+    s._id === govName ||
+    s.city === govName || 
+    s.cityOtherName === govName ||
+    (normGov && (normalizeCity(s.city) === normGov || normalizeCity(s.cityOtherName) === normGov))
+  );
+
   const govEl = document.getElementById('c-gov');
   if (govEl) govEl.value = govData ? govData._id : '';
   const searchInput = document.getElementById('c-gov-search');
-  if (searchInput && govData) {
-    searchInput.value = govData.cityOtherName || govData.city;
+  if (searchInput) {
+    searchInput.value = govData ? (govData.cityOtherName || govData.city) : govName;
   }
 
   await handleCityChange();
