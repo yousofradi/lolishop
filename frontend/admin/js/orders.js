@@ -654,8 +654,12 @@ window.printInvoices = async function () {
   showToast('جاري تحميل جميع الفواتير من PDFBolt...', 'info');
   
   try {
-    const url = `${API_BASE}/orders/bulk/download-pdf?adminKey=${adminKey}`;
-    const response = await fetch(url);
+    const response = await fetch(`${API_BASE}/orders/bulk/download-pdf`, {
+      headers: {
+        'x-admin-key': adminKey,
+        'Authorization': `Bearer ${adminKey}`
+      }
+    });
     
     if (!response.ok) {
         const error = await response.text();

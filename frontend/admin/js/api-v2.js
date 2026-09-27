@@ -71,10 +71,7 @@ const api = {
     const currentKey = this._adminKey();
     if (currentKey) {
       headers['x-admin-key'] = currentKey;
-      if (method === 'GET' && !finalPath.includes('adminKey=')) {
-        const separator = finalPath.includes('?') ? '&' : '?';
-        finalPath += `${separator}adminKey=${encodeURIComponent(currentKey)}`;
-      }
+      headers['Authorization'] = `Bearer ${currentKey}`;
     }
 
     if (opts.useCache !== true && method === 'GET') {

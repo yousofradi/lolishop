@@ -64,6 +64,7 @@ const api = {
     const currentKey = this._adminKey();
     if (currentKey) {
       headers['x-admin-key'] = currentKey;
+      headers['Authorization'] = `Bearer ${currentKey}`;
     }
     
     // Add cache busting if not explicitly cached
@@ -71,10 +72,6 @@ const api = {
     if (opts.useCache !== true && method === 'GET') {
       opts.cache = 'no-store';
       path += (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
-    }
-
-    if (currentKey && method === 'GET' && !path.includes('adminKey=')) {
-      path += (path.includes('?') ? '&' : '?') + 'adminKey=' + encodeURIComponent(currentKey);
     }
     
     const base = getNormalizedApiBase();
