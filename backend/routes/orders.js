@@ -1082,8 +1082,9 @@ router.put('/:orderId', adminAuth, async (req, res) => {
     const order = await Order.findOne(query);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    // Special action: Resend / Force trigger payment & created webhooks
-    if (updates.forcePaymentWebhook) {
+    // Special action: Resend / Force trigger payment & created webhooks only (when no order update is requested)
+    const isWebhookOnly = updates.forcePaymentWebhook && !updates.items && updates.paidAmount === undefined && !updates.customer && !updates.status;
+    if (isWebhookOnly) {
       const event = (order.paidAmount > 0) ? 'order.paid' : 'order.created';
       console.log(`[Webhook] Force triggering webhooks and WhatsApp for ${event} - order ${order.orderId}`);
       sendWebhook(event, order.toObject()).catch(err => {
@@ -1103,6 +1104,7 @@ router.put('/:orderId', adminAuth, async (req, res) => {
           message: 'تم تعديل هذا الطلب بالفعل بواسطة مستخدم آخر. يرجى تحديث الصفحة للحصول على أحدث البيانات.' 
         });
       }
+      delete updates.updatedAt;
     }
 
     // Handle stock adjustment only for actual difference between old and new items if order is not cancelled

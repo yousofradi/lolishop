@@ -1207,12 +1207,27 @@ window.markFullyPaid = async function (btn) {
   // Instant UI update
   renderOrder();
 
-  // Save immediately
-  const success = await saveOrderChanges(true);
-
-  if (!success && btn) {
-    btn.disabled = false;
-    btn.innerHTML = 'مدفوع بالكامل';
+  try {
+    const success = await saveOrderChanges(true);
+    if (success) {
+      showToast('تم تحديث حالة الدفع إلى مدفوع بالكامل');
+    } else {
+      if (typeof originalOrder !== 'undefined' && originalOrder) {
+        currentOrder = JSON.parse(JSON.stringify(originalOrder));
+      }
+    }
+  } catch (err) {
+    console.error('Error marking order fully paid:', err);
+    if (typeof originalOrder !== 'undefined' && originalOrder) {
+      currentOrder = JSON.parse(JSON.stringify(originalOrder));
+    }
+    showToast('حدث خطأ أثناء حفظ حالة الدفع', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'مدفوع بالكامل';
+    }
+    renderOrder();
   }
 };
 
