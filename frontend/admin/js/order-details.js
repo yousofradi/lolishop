@@ -371,7 +371,7 @@ function renderOrder() {
 
   // Transfer info card
   const transferCard = document.getElementById('transfer-info-card');
-  
+
   // Extract transfer notes from legacy customer.notes if present
   let displayNotes = o.customer.notes || '';
   let legacyTransferNotes = '';
@@ -380,26 +380,26 @@ function renderOrder() {
     displayNotes = parts[0].trim();
     legacyTransferNotes = parts.slice(1).join('[معلومات التحويل]:').trim();
   }
-  
+
   if (transferCard) transferCard.style.display = 'block';
   document.getElementById('admin-transfer-number').value = o.transferNumber || '';
   document.getElementById('admin-transfer-notes').value = o.transferNotes || legacyTransferNotes || '';
-    
-    const screenLink = document.getElementById('admin-transfer-screenshot-link');
-    const screenImg = document.getElementById('admin-transfer-screenshot-img');
-    const removeBtn = document.getElementById('admin-transfer-screenshot-remove');
-    
-    if (o.transferScreenshot) {
-      screenLink.href = o.transferScreenshot;
-      screenImg.src = api.optimizeImageUrl(o.transferScreenshot, 300);
-      screenLink.style.display = 'block';
-      removeBtn.style.display = 'block';
-    } else {
-      screenLink.href = '#';
-      screenImg.src = '';
-      screenLink.style.display = 'none';
-      removeBtn.style.display = 'none';
-    }
+
+  const screenLink = document.getElementById('admin-transfer-screenshot-link');
+  const screenImg = document.getElementById('admin-transfer-screenshot-img');
+  const removeBtn = document.getElementById('admin-transfer-screenshot-remove');
+
+  if (o.transferScreenshot) {
+    screenLink.href = o.transferScreenshot;
+    screenImg.src = api.optimizeImageUrl(o.transferScreenshot, 300);
+    screenLink.style.display = 'block';
+    removeBtn.style.display = 'block';
+  } else {
+    screenLink.href = '#';
+    screenImg.src = '';
+    screenLink.style.display = 'none';
+    removeBtn.style.display = 'none';
+  }
   if (transferCard) {
     // If it's a completely different payment method that isn't supposed to have transfer info, we could optionally style it differently,
     // but the user requested it to be visible.
@@ -419,11 +419,11 @@ function renderOrder() {
   const promoName = document.getElementById('view-applied-promo');
   const giftsContainer = document.getElementById('free-gifts-container');
   const giftsList = document.getElementById('free-gifts-list');
-  
+
   let hasPromo = false;
   if (o.appliedPromotionName) {
     promoRow.style.display = 'flex';
-    
+
     // Resolve rewards array (use stored rewards, fallback to constructed rewards from promotion object, fallback to splitting reward text)
     let rewards = [];
     if (Array.isArray(o.appliedPromotionRewards) && o.appliedPromotionRewards.filter(Boolean).length > 0) {
@@ -437,12 +437,12 @@ function renderOrder() {
     } else if (o.appliedPromotionRewardText) {
       rewards = o.appliedPromotionRewardText.split(' و ').map(r => r.trim()).filter(Boolean);
     }
-    
+
     let badgesHtml = '';
     if (rewards.length > 0) {
       badgesHtml = rewards.map(r => `<span style="background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; white-space:nowrap;">${r}</span>`).join('');
     }
-    
+
     promoRow.innerHTML = `
       <span style="font-weight:700; color:var(--primary); white-space:nowrap;">${o.appliedPromotionName}</span>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content: flex-end;">
@@ -736,13 +736,6 @@ window.handleModalCityChange = async function () {
 window.handleModalCarrierChange = function () {
 };
 
-  const govContainer = document.getElementById('modal-c-gov-search-container');
-  const govDropdown = document.getElementById('modal-c-gov-dropdown');
-  if (govContainer && !govContainer.contains(e.target)) {
-    govDropdown.style.display = 'none';
-  }
-});
-
 window.applyCustomerChanges = async function (btn) {
   if (btn) {
     btn.disabled = true;
@@ -998,7 +991,7 @@ window.openOrderDiscountModal = function () {
 window.applyOrderDiscount = async function (type) {
   const val = document.getElementById('modal-order-discount').value;
   const num = Math.abs(parseFloat(val) || 0);
-  
+
   // 'increase' adds to total (negative discount in formula: total = subtotal + shipping - discount)
   // 'discount' reduces total (positive discount)
   if (type === 'increase') {
@@ -1594,14 +1587,14 @@ window.confirmMarkAsReady = async function (btn) {
 let pendingTransferScreenshotFile = null;
 let pendingTransferScreenshotRemoved = false;
 
-window.previewAdminTransferScreenshot = function(input) {
+window.previewAdminTransferScreenshot = function (input) {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   pendingTransferScreenshotFile = file;
   pendingTransferScreenshotRemoved = false;
-  
+
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     document.getElementById('admin-transfer-screenshot-img').src = e.target.result;
     document.getElementById('admin-transfer-screenshot-link').style.display = 'block';
     document.getElementById('admin-transfer-screenshot-remove').style.display = 'block';
@@ -1609,7 +1602,7 @@ window.previewAdminTransferScreenshot = function(input) {
   reader.readAsDataURL(file);
 };
 
-window.removeAdminTransferScreenshot = function() {
+window.removeAdminTransferScreenshot = function () {
   pendingTransferScreenshotFile = null;
   pendingTransferScreenshotRemoved = true;
   document.getElementById('admin-transfer-screenshot-input').value = '';
@@ -1618,14 +1611,14 @@ window.removeAdminTransferScreenshot = function() {
   document.getElementById('admin-transfer-screenshot-remove').style.display = 'none';
 };
 
-window.saveTransferInfo = async function(btn) {
+window.saveTransferInfo = async function (btn) {
   const originalText = btn.textContent;
   btn.textContent = 'جاري الحفظ...';
   btn.disabled = true;
-  
+
   try {
     let screenshotUrl = currentOrder.transferScreenshot;
-    
+
     if (pendingTransferScreenshotRemoved) {
       screenshotUrl = null;
     } else if (pendingTransferScreenshotFile) {
@@ -1642,7 +1635,7 @@ window.saveTransferInfo = async function(btn) {
       const uploadData = await uploadRes.json();
       screenshotUrl = uploadData.url;
     }
-    
+
     const updateRes = await fetch(`${typeof API_BASE !== 'undefined' ? API_BASE : ''}/orders/public/${currentOrder.orderId}/transfer-info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1652,17 +1645,17 @@ window.saveTransferInfo = async function(btn) {
         transferScreenshot: screenshotUrl
       })
     });
-    
+
     if (!updateRes.ok) throw new Error('فشل حفظ بيانات التحويل');
-    
+
     // Update local state
     currentOrder.transferNumber = document.getElementById('admin-transfer-number').value;
     currentOrder.transferNotes = document.getElementById('admin-transfer-notes').value;
     currentOrder.transferScreenshot = screenshotUrl;
-    
+
     pendingTransferScreenshotFile = null;
     pendingTransferScreenshotRemoved = false;
-    
+
     showToast('تم الحفظ بنجاح', 'success');
   } catch (err) {
     showToast(err.message, 'error');
