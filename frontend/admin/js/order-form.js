@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const [settings, shippingOptionsRes, collectionsRes] = await Promise.all([
-      api.getSetting('loli_global_settings').catch(() => ({})),
+      api.getSetting('sundura_global_settings').catch(() => ({})),
       api.getSetting('shipping_options').catch(() => []),
       api.getCollections().catch(() => [])
     ]);
@@ -1099,15 +1099,23 @@ function resetCustomerSelectionUI() {
     if (nameField) {
       nameField.value = '';
       nameField.readOnly = false;
-      document.getElementById('c-phone').value = '';
-      document.getElementById('c-phone').readOnly = false;
-      document.getElementById('c-second-phone').value = '';
-      document.getElementById('c-address').value = '';
-      document.getElementById('c-gov').value = '';
+      const phoneEl = document.getElementById('c-phone');
+      if (phoneEl) {
+        phoneEl.value = '';
+        phoneEl.readOnly = false;
+      }
+      const secondPhoneEl = document.getElementById('c-second-phone');
+      if (secondPhoneEl) secondPhoneEl.value = '';
+      const addressEl = document.getElementById('c-address');
+      if (addressEl) addressEl.value = '';
+      const govEl = document.getElementById('c-gov');
+      if (govEl) govEl.value = '';
       const govSearch = document.getElementById('c-gov-search');
       if (govSearch) govSearch.value = '';
-      document.getElementById('c-zone').value = '';
-      document.getElementById('zone-dropdown').innerHTML = '';
+      const zoneEl = document.getElementById('c-zone');
+      if (zoneEl) zoneEl.value = '';
+      const zoneDropdown = document.getElementById('zone-dropdown');
+      if (zoneDropdown) zoneDropdown.innerHTML = '';
     }
 
     // Hide customer fields again in existing customer mode
@@ -1144,25 +1152,33 @@ window.selectCustomer = async function (phone) {
   const customer = allCustomers.find(c => c.phone === phone);
   if (!customer) return;
 
-  document.getElementById('c-name').value = customer.name || '';
-  document.getElementById('c-phone').value = customer.phone || '';
-  document.getElementById('c-second-phone').value = customer.secondPhone || '';
+  const nameEl = document.getElementById('c-name');
+  if (nameEl) nameEl.value = customer.name || '';
+  const phoneEl = document.getElementById('c-phone');
+  if (phoneEl) phoneEl.value = customer.phone || '';
+  const secondPhoneEl = document.getElementById('c-second-phone');
+  if (secondPhoneEl) secondPhoneEl.value = customer.secondPhone || '';
   
   // Map government name to ID
   const govName = customer.government || '';
   const govData = (window._fullShippingData || []).find(s => s.city === govName || s.cityOtherName === govName);
-  document.getElementById('c-gov').value = govData ? govData._id : '';
+  const govEl = document.getElementById('c-gov');
+  if (govEl) govEl.value = govData ? govData._id : '';
   const searchInput = document.getElementById('c-gov-search');
   if (searchInput && govData) {
     searchInput.value = govData.cityOtherName || govData.city;
   }
 
   await handleCityChange(); // Populates zones
-  document.getElementById('c-zone').value = customer.zone || '';
-  document.getElementById('c-address').value = customer.address || '';
+  const zoneEl = document.getElementById('c-zone');
+  if (zoneEl) zoneEl.value = customer.zone || '';
+  const addressEl = document.getElementById('c-address');
+  if (addressEl) addressEl.value = customer.address || '';
   
-  document.getElementById('customer-search').value = customer.name || customer.phone;
-  document.getElementById('customer-dropdown').classList.remove('active');
+  const searchInputCust = document.getElementById('customer-search');
+  if (searchInputCust) searchInputCust.value = customer.name || customer.phone;
+  const custDropdown = document.getElementById('customer-dropdown');
+  if (custDropdown) custDropdown.classList.remove('active');
   
   // Update UI to "selected" state
   const input = document.getElementById('customer-search');
@@ -1174,9 +1190,9 @@ window.selectCustomer = async function (phone) {
 
   if (display) {
     const initials = customer.name ? customer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
-    sAvatar.textContent = initials;
-    sName.textContent = customer.name || 'بدون اسم';
-    sPhone.textContent = '+' + customer.phone;
+    if (sAvatar) sAvatar.textContent = initials;
+    if (sName) sName.textContent = customer.name || 'بدون اسم';
+    if (sPhone) sPhone.textContent = '+' + customer.phone;
     
     display.classList.add('active');
     if (input) input.style.display = 'none';
@@ -1188,37 +1204,45 @@ window.selectCustomer = async function (phone) {
   if (fields) fields.style.display = 'block';
 
   // Disable editing of primary info for selected customers
-  document.getElementById('c-name').readOnly = false;
-  document.getElementById('c-phone').readOnly = false;
+  if (nameEl) nameEl.readOnly = false;
+  if (phoneEl) phoneEl.readOnly = false;
   
   if (window.recalcSummary) recalcSummary();
   if (window.markAsModified) window.markAsModified();
 };
 
 window.toggleCustomerMode = function (autoExpand = true) {
-  const mode = document.querySelector('input[name="customer_type"]:checked').value;
+  const mode = document.querySelector('input[name="customer_type"]:checked')?.value;
   const existingSection = document.getElementById('existing-customer-section');
   const fields = document.getElementById('customer-fields');
   
   if (mode === 'new') {
-    existingSection.style.display = 'none';
+    if (existingSection) existingSection.style.display = 'none';
     if (fields) fields.style.display = 'block';
     // Clear fields
-    document.getElementById('c-name').value = '';
-    document.getElementById('c-phone').value = '';
-    document.getElementById('c-second-phone').value = '';
-    document.getElementById('c-address').value = '';
-    document.getElementById('c-gov').value = '';
+    const nameEl = document.getElementById('c-name');
+    if (nameEl) nameEl.value = '';
+    const phoneEl = document.getElementById('c-phone');
+    if (phoneEl) phoneEl.value = '';
+    const secondPhoneEl = document.getElementById('c-second-phone');
+    if (secondPhoneEl) secondPhoneEl.value = '';
+    const addressEl = document.getElementById('c-address');
+    if (addressEl) addressEl.value = '';
+    const govEl = document.getElementById('c-gov');
+    if (govEl) govEl.value = '';
     const govSearch = document.getElementById('c-gov-search');
     if (govSearch) govSearch.value = '';
-    document.getElementById('c-zone').value = '';
-    document.getElementById('zone-dropdown').innerHTML = '';
-    document.getElementById('customer-search').value = '';
+    const zoneEl = document.getElementById('c-zone');
+    if (zoneEl) zoneEl.value = '';
+    const zoneDropdown = document.getElementById('zone-dropdown');
+    if (zoneDropdown) zoneDropdown.innerHTML = '';
+    const custSearch = document.getElementById('customer-search');
+    if (custSearch) custSearch.value = '';
     
     // Reset selected UI
     resetCustomerSelectionUI();
   } else {
-    existingSection.style.display = 'block';
+    if (existingSection) existingSection.style.display = 'block';
     
     // In existing customer mode, hide the input fields until a customer is chosen
     const display = document.getElementById('selected-customer-display');
@@ -1316,8 +1340,10 @@ function renderZoneDropdown(zones) {
 }
 
 window.selectZone = function (name) {
-  document.getElementById('c-zone').value = name;
-  document.getElementById('zone-dropdown').classList.remove('active');
+  const zoneEl = document.getElementById('c-zone');
+  if (zoneEl) zoneEl.value = name;
+  const zoneDropdown = document.getElementById('zone-dropdown');
+  if (zoneDropdown) zoneDropdown.classList.remove('active');
   
   recalcSummary();
   if (window.markAsModified) window.markAsModified();
