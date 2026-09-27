@@ -1172,6 +1172,13 @@ let modalSelectedVariants = new Map(); // Key: pid-comboStr, Value: {pid, combo,
 window.openProductsModal = async function () {
   modalSelectedProducts.clear();
   modalSelectedVariants.clear();
+
+  const addBtn = document.getElementById('btn-add-modal-products');
+  if (addBtn) {
+    addBtn.disabled = false;
+    addBtn.innerHTML = 'أضف منتج';
+  }
+
   openModal('products-modal');
   if (Object.keys(collectionsMap).length === 0) {
     try {
@@ -1203,6 +1210,11 @@ window.openProductsModal = async function () {
 };
 
 window.closeProductsModal = function () {
+  const addBtn = document.getElementById('btn-add-modal-products');
+  if (addBtn) {
+    addBtn.disabled = false;
+    addBtn.innerHTML = 'أضف منتج';
+  }
   closeModal('products-modal');
 };
 
@@ -1345,77 +1357,93 @@ window.renderModalProducts = function () {
 };
 
 window.addSelectedProducts = function (btn) {
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:8px;display:inline-block;vertical-align:middle;"></span> جاري الإضافة...';
+  if (modalSelectedProducts.size === 0 && modalSelectedVariants.size === 0) {
+    return showToast('اختر منتجاً واحداً على الأقل', 'error');
   }
-  // 1. Add simple products from persistent set
-  modalSelectedProducts.forEach(pid => {
-    const p = allProducts.find(x => x._id === pid);
-    if (p) {
-      const effectiveBase = (p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice;
-      const existing = currentOrder.items.find(i => i.productId === p._id && (!i.selectedOptions || i.selectedOptions.length === 0));
-      if (existing) {
-        existing.quantity++;
-      } else {
-        currentOrder.items.push({
-          productId: p._id,
-          name: p.name,
-          imageUrl: (p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || ''),
-          basePrice: effectiveBase,
-          selectedOptions: [],
-          quantity: 1,
-          discount: 0,
-          finalPrice: effectiveBase
-        });
-      }
-    }
-  });
 
-  // 2. Add variants from persistent map
-  modalSelectedVariants.forEach(v => {
-    const p = allProducts.find(x => x._id === v.pid);
-    if (p) {
-      const variantPrice = v.price;
-      const combo = v.combo;
-      const existing = currentOrder.items.find(i => {
-        if (i.productId !== p._id) return false;
-        if (!i.selectedOptions || i.selectedOptions.length !== combo.length) return false;
-        return combo.every(c => i.selectedOptions.some(so => so.groupName === c.groupName && so.label === c.label));
-      });
+  const targetBtn = btn || document.getElementById('btn-add-modal-products');
+  if (targetBtn) {
+    targetBtn.disabled = true;
+    targetBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:8px;display:inline-block;vertical-align:middle;"></span> جاري الإضافة...';
+  }
 
-      if (existing) {
-        existing.quantity++;
-      } else {
-        let variantImageUrl = '';
-        if (p.variants && p.variants.length > 0 && combo && combo.length > 0) {
-          const matchingVariant = p.variants.find(varObj => {
-            if (!varObj.combination) return false;
-            return combo.every(opt => varObj.combination[opt.groupName] === opt.label);
+  try {
+    // 1. Add simple products from persistent set
+    modalSelectedProducts.forEach(pid => {
+      const p = allProducts.find(x => x._id === pid);
+      if (p) {
+        const effectiveBase = (p.salePrice && p.salePrice < p.basePrice) ? p.salePrice : p.basePrice;
+        const existing = currentOrder.items.find(i => i.productId === p._id && (!i.selectedOptions || i.selectedOptions.length === 0));
+        if (existing) {
+          existing.quantity++;
+        } else {
+          currentOrder.items.push({
+            productId: p._id,
+            name: p.name,
+            imageUrl: (p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || ''),
+            basePrice: effectiveBase,
+            selectedOptions: [],
+            quantity: 1,
+            discount: 0,
+            finalPrice: effectiveBase
           });
-          if (matchingVariant && matchingVariant.imageUrl) {
-            variantImageUrl = matchingVariant.imageUrl;
-          }
         }
-
-        currentOrder.items.push({
-          productId: p._id,
-          name: p.name,
-          imageUrl: variantImageUrl || ((p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || '')),
-          basePrice: variantPrice,
-          selectedOptions: combo,
-          quantity: 1,
-          discount: 0,
-          finalPrice: variantPrice
-        });
       }
-    }
-  });
+    });
 
-  renderItems();
-  updateTotals();
-  if (window.markAsModified) window.markAsModified();
-  closeProductsModal();
+    // 2. Add variants from persistent map
+    modalSelectedVariants.forEach(v => {
+      const p = allProducts.find(x => x._id === v.pid);
+      if (p) {
+        const variantPrice = v.price;
+        const combo = v.combo;
+        const existing = currentOrder.items.find(i => {
+          if (i.productId !== p._id) return false;
+          if (!i.selectedOptions || i.selectedOptions.length !== combo.length) return false;
+          return combo.every(c => i.selectedOptions.some(so => so.groupName === c.groupName && so.label === c.label));
+        });
+
+        if (existing) {
+          existing.quantity++;
+        } else {
+          let variantImageUrl = '';
+          if (p.variants && p.variants.length > 0 && combo && combo.length > 0) {
+            const matchingVariant = p.variants.find(varObj => {
+              if (!varObj.combination) return false;
+              return combo.every(opt => varObj.combination[opt.groupName] === opt.label);
+            });
+            if (matchingVariant && matchingVariant.imageUrl) {
+              variantImageUrl = matchingVariant.imageUrl;
+            }
+          }
+
+          currentOrder.items.push({
+            productId: p._id,
+            name: p.name,
+            imageUrl: variantImageUrl || ((p.images && p.images.length > 0) ? p.images[0] : (p.imageUrl || '')),
+            basePrice: variantPrice,
+            selectedOptions: combo,
+            quantity: 1,
+            discount: 0,
+            finalPrice: variantPrice
+          });
+        }
+      }
+    });
+
+    renderItems();
+    updateTotals();
+    if (window.markAsModified) window.markAsModified();
+    closeProductsModal();
+  } catch (err) {
+    console.error('Error adding products:', err);
+    showToast('حدث خطأ أثناء إضافة المنتجات', 'error');
+  } finally {
+    if (targetBtn) {
+      targetBtn.disabled = false;
+      targetBtn.innerHTML = 'أضف منتج';
+    }
+  }
 };
 
 window.toggleDetailsMenu = function (e) {
