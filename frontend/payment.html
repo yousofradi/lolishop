@@ -116,12 +116,14 @@
 
     function renderPaymentDetails() {
       const methods = storeSettings.paymentMethods || [];
-      const selected = methods.find(m => m.label === currentOrder.paymentMethod) || methods[0];
+      const selected = methods.find(m => m.id === currentOrder.paymentMethod || m.label === currentOrder.paymentMethod) || methods[0];
       
       if (!selected) {
         document.getElementById('payment-method-details').style.display = 'none';
         return;
       }
+
+      const holderName = selected.accountHolder || selected.recipientName || '';
 
       document.getElementById('payment-method-details').innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
@@ -133,9 +135,9 @@
               <span class="method-badge" style="margin:0; background: var(--primary, #ef4444);">${selected.label}</span>
            </div>
         </div>
-        ${(selected.accountHolder || selected.recipientName) ? `
-          <div style="font-size:0.95rem; color:#475569; margin: 4px 0; font-weight:600;">
-            اسم المحول إليه: <strong style="color:#0f172a; font-weight:800;">${selected.accountHolder || selected.recipientName}</strong>
+        ${holderName ? `
+          <div style="font-size:1rem; color:#475569; margin: 8px 0; font-weight:700; background:#f8fafc; padding:8px 16px; border-radius:10px; border:1px solid #e2e8f0; width:100%; text-align:center; box-sizing:border-box;">
+            اسم المحول إليه: <strong style="color:var(--primary, #0f172a); font-weight:800;">${holderName}</strong>
           </div>
         ` : ''}
         <span class="method-number" id="pay-number">${selected.number}</span>

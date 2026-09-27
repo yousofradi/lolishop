@@ -119,8 +119,8 @@ async function loadPaymentMethods() {
                ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'}
             </div>
             <div>
-              <span style="font-weight:700; font-size:0.9rem; color:var(--text-main); display:block;">${m.label}</span>
-              ${(m.accountHolder || m.recipientName) ? `<span style="font-size:0.78rem; color:#64748b; display:block; margin-top:2px;">المحول إليه: <strong style="color:#1e293b;">${m.accountHolder || m.recipientName}</strong></span>` : ''}
+              <span style="font-weight:700; font-size:0.95rem; color:var(--text-main); display:block;">${m.label}</span>
+              ${(m.accountHolder || m.recipientName) ? `<div style="font-size:0.8rem; color:#64748b; margin-top:2px;">اسم المحول إليه: <strong style="color:var(--primary, #916C4F);">${m.accountHolder || m.recipientName}</strong></div>` : ''}
             </div>
           </div>
           
