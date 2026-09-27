@@ -140,13 +140,6 @@ router.post('/:key', adminAuth, async (req, res) => {
               let updated = false;
               if (!isNaN(newFee) && record.fee !== newFee) {
                 record.fee = newFee;
-                updated = true;
-              }
-              if (cityObj.zones && Array.isArray(cityObj.zones)) {
-                record.zones = cityObj.zones;
-                updated = true;
-              }
-              if (updated) {
                 await record.save();
               }
             }
@@ -155,10 +148,6 @@ router.post('/:key', adminAuth, async (req, res) => {
           // Clear Redis cache so `/api/shipping` immediately reflects the new fees!
           try {
             await redis.del(SHIPPING_CACHE_KEY);
-            const keys = await redis.keys('storefront:shipping:zones:*');
-            if (keys && keys.length > 0) {
-              await redis.del(keys);
-            }
           } catch (err) {
             console.error('[Redis] Shipping list cache clear failed:', err.message);
           }

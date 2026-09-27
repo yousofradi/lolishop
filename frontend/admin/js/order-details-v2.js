@@ -13,7 +13,7 @@ function getCarrierInternalValue(name) {
   return name;
 }
 
-function resolveShippingDetails(cityName, zoneName, forcedCarrier) {
+function resolveShippingDetails(cityName, forcedCarrier) {
   const isCityEqual = (a, b) => {
     if (!a || !b) return false;
     const norm = (s) => s.replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, '').toLowerCase().trim();
@@ -24,13 +24,6 @@ function resolveShippingDetails(cityName, zoneName, forcedCarrier) {
   let govData = (window._fullShippingData || []).find(s =>
     isCityEqual(s.city, cityName) || isCityEqual(s.cityOtherName, cityName)
   );
-
-  if (!forcedCarrier && zoneName && govData && govData.zones && govData.zones.length > 0) {
-    const selectedZoneObj = govData.zones.find(z => api.formatZoneName(z) === zoneName);
-    if (!selectedZoneObj || selectedZoneObj.bostaAvailable === false || selectedZoneObj.dropOffAvailability === false) {
-      carrier = 'egyptpost';
-    }
-  }
 
   let fee = 0;
   if (!window._shippingOptions || window._shippingOptions.length === 0) {
@@ -49,8 +42,8 @@ function resolveShippingDetails(cityName, zoneName, forcedCarrier) {
   return { fee, carrier };
 }
 
-function getShippingFeeForCityAndZone(cityName, zoneName) {
-  const details = resolveShippingDetails(cityName, zoneName);
+function getShippingFeeForCity(cityName) {
+  const details = resolveShippingDetails(cityName);
   return details.fee;
 }
 
@@ -372,16 +365,6 @@ function renderOrder() {
       </span>`;
     } else {
       govEl.innerHTML += ' <span class="badge badge-info" style="background:#f1f5f9; color:#475569; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; margin-right:8px; font-weight:700;">بوسطة (غير مشحون)</span>';
-    }
-  }
-
-  const viewZone = document.getElementById('view-c-zone');
-  if (window._globalSettings?.enableZones === false) {
-    if (viewZone) viewZone.style.display = 'none';
-  } else {
-    if (viewZone) {
-      viewZone.style.display = 'block';
-      viewZone.textContent = o.customer.zone || 'لا توجد منطقة';
     }
   }
 
@@ -823,15 +806,6 @@ window.openCustomerModal = function () {
     }
   }
 
-  const zoneContainer = document.getElementById('modal-c-zone-container');
-  if (zoneContainer) {
-    zoneContainer.style.display = window._globalSettings?.enableZones === false ? 'none' : 'block';
-  }
-
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (zoneInput) {
-    zoneInput.value = currentOrder.customer.zone || '';
-  }
   const addressInput = document.getElementById('modal-c-address');
   if (addressInput) {
     addressInput.value = currentOrder.customer.address || '';
@@ -842,104 +816,16 @@ window.openCustomerModal = function () {
   }
 
   openModal('customer-modal');
-
-  // Load the zones in the background without blocking the UI
-  handleModalCityChange(true).then(() => {
-    const zInp = document.getElementById('modal-c-zone');
-    if (zInp) zInp.value = currentOrder.customer.zone || '';
-  });
 };
 
-window.handleModalCityChange = async function (skipZoneClear = false) {
-  const cityId = document.getElementById('modal-c-gov').value;
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (!zoneInput) return;
-
-  if (!skipZoneClear) {
-    zoneInput.value = ''; // Clear current selection
-  }
-  window._modalZones = [];
-
-  if (cityId) {
-    try {
-      const zones = await api.getZones(cityId);
-      window._modalZones = zones || [];
-    } catch (err) {
-      console.error('Failed to fetch modal zones:', err);
-      window._modalZones = [];
-    }
-  }
-
-  window.handleModalCarrierChange();
-  renderModalZoneDropdown();
+window.handleModalCityChange = async function () {
+  // City change handler
 };
 
 window.handleModalCarrierChange = function () {
-  const carrier = document.getElementById('modal-c-carrier')?.value || 'egyptpost';
-  const zoneContainer = document.getElementById('modal-c-zone-container');
-  if (zoneContainer) {
-    if (carrier === 'bosta' && window._globalSettings?.enableZones !== false && window._modalZones && window._modalZones.length > 0) {
-      zoneContainer.style.display = 'block';
-    } else {
-      zoneContainer.style.display = 'none';
-      const zoneInput = document.getElementById('modal-c-zone');
-      if (zoneInput) zoneInput.value = '';
-    }
-  }
-};
-
-window.renderModalZoneDropdown = function () {
-  const dropdown = document.getElementById('modal-c-zone-dropdown');
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (!dropdown || !zoneInput) return;
-  const query = zoneInput.value.trim();
-
-  if (!window._modalZones || window._modalZones.length === 0) {
-    dropdown.style.display = 'none';
-    return;
-  }
-
-  // Prevent dropdown from opening if the zone input field is not currently focused by the user
-  if (document.activeElement !== zoneInput) {
-    dropdown.style.display = 'none';
-    return;
-  }
-
-  const filtered = window._modalZones.filter(z =>
-    smartMatch(api.formatZoneName(z), query)
-  );
-
-  dropdown.style.display = 'block';
-  if (filtered.length === 0) {
-    dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد مناطق مطابقة</div>';
-  } else {
-    dropdown.innerHTML = filtered.map(z => {
-      const zoneLabel = api.formatZoneName(z);
-      return `
-        <div class="dropdown-item" onclick="selectModalZone('${zoneLabel.replace(/'/g, "\\'")}')" 
-          style="padding: 10px 16px; cursor: pointer; transition: background 0.2s;"
-          onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-          ${zoneLabel}
-        </div>
-      `;
-    }).join('');
-  }
-}
-
-window.selectModalZone = function (val) {
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (zoneInput) zoneInput.value = val;
-  const dropdown = document.getElementById('modal-c-zone-dropdown');
-  if (dropdown) dropdown.style.display = 'none';
 };
 
 document.addEventListener('click', (e) => {
-  const container = document.getElementById('modal-c-zone-search-container');
-  const dropdown = document.getElementById('modal-c-zone-dropdown');
-  if (container && dropdown && !container.contains(e.target)) {
-    dropdown.style.display = 'none';
-  }
-
   const govContainer = document.getElementById('modal-c-gov-search-container');
   const govDropdown = document.getElementById('modal-c-gov-dropdown');
   if (govContainer && !govContainer.contains(e.target)) {
@@ -957,7 +843,6 @@ window.applyCustomerChanges = async function (btn) {
   const phone = document.getElementById('modal-c-phone').value.trim();
   const cityId = document.getElementById('modal-c-gov').value;
   const cityNameFromSearch = document.getElementById('modal-c-gov-search').value.trim();
-  const zone = document.getElementById('modal-c-zone')?.value || '';
 
   const carrier = document.getElementById('modal-c-carrier')?.value || 'egyptpost';
   let govData = (window._fullShippingData || []).find(s => s._id === cityId);
@@ -1006,10 +891,9 @@ window.applyCustomerChanges = async function (btn) {
   currentOrder.customer.phone = phone;
   currentOrder.customer.secondPhone = document.getElementById('modal-c-phone2').value.trim();
   currentOrder.customer.government = cityName;
-  currentOrder.customer.zone = zone;
 
   // Determine carrier and override shipping fee using resolveShippingDetails
-  const shipDetails = resolveShippingDetails(cityName, zone, carrier);
+  const shipDetails = resolveShippingDetails(cityName, carrier);
   currentOrder.carrier = shipDetails.carrier;
   currentOrder.shippingFee = shipDetails.fee;
 

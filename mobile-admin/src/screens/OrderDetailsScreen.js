@@ -89,7 +89,7 @@ export default function OrderDetailsScreen({ route, navigation }) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>عنوان الشحن</Text>
-          <Text style={styles.text}>{order.shippingAddress?.governorate} - {order.shippingAddress?.zone}</Text>
+          <Text style={styles.text}>{order.shippingAddress?.governorate}</Text>
           <Text style={styles.text}>{order.shippingAddress?.city} - {order.shippingAddress?.village}</Text>
           <Text style={styles.text}>{order.shippingAddress?.details}</Text>
         </View>

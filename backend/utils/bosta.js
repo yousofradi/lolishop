@@ -52,67 +52,6 @@ async function generateBostaPayload(order, bostaConfig) {
     firstLine: order.customer.address
   };
 
-  if (shippingRecord && shippingRecord.zones) {
-    const formatZoneName = (z) => {
-      if (!z) return '';
-      const main = (z.zoneOtherName || z.otherName || z.name || '').trim();
-      const dist = (z.districtOtherName || z.districtName || '').trim();
-      return dist && dist !== main ? `${main} - ${dist}` : main;
-    };
-
-    const normalizedTarget = normalizeString(order.customer.zone);
-    const targetParts = (order.customer.zone || '').split('-').map(p => normalizeString(p));
-
-    // Find the best matching zone record by prioritizing the most specific match first
-    let zoneRecord = null;
-
-    // Priority 1: Exact match on compound name
-    zoneRecord = shippingRecord.zones.find(z => {
-      const compound = formatZoneName(z);
-      return normalizeString(compound) === normalizedTarget;
-    });
-
-    // Priority 2: Exact match on district specific names (name, otherName, districtOtherName, districtName)
-    if (!zoneRecord) {
-      zoneRecord = shippingRecord.zones.find(z => {
-        return normalizeString(z.otherName) === normalizedTarget ||
-          normalizeString(z.name) === normalizedTarget ||
-          (z.districtOtherName && normalizeString(z.districtOtherName) === normalizedTarget) ||
-          (z.districtName && normalizeString(z.districtName) === normalizedTarget);
-      });
-    }
-
-    // Priority 3: Match on targetParts, but ONLY matching district-specific names to prevent general zone mismatch
-    if (!zoneRecord) {
-      zoneRecord = shippingRecord.zones.find(z => {
-        return targetParts.some(part => {
-          return normalizeString(z.otherName) === part ||
-            normalizeString(z.name) === part ||
-            (z.districtOtherName && normalizeString(z.districtOtherName) === part) ||
-            (z.districtName && normalizeString(z.districtName) === part);
-        });
-      });
-    }
-
-    // Priority 4: Fallback to general zone matching if still not matched
-    if (!zoneRecord) {
-      zoneRecord = shippingRecord.zones.find(z => {
-        const compound = formatZoneName(z);
-        return normalizeString(z.zoneName) === normalizedTarget ||
-          normalizeString(z.zoneOtherName) === normalizedTarget ||
-          targetParts.some(part =>
-            normalizeString(z.zoneName) === part ||
-            normalizeString(z.zoneOtherName) === part ||
-            normalizeString(compound) === part
-          );
-      });
-    }
-
-    if (zoneRecord && zoneRecord.bostaDistrictId) {
-      dropOffAddress.districtId = zoneRecord.bostaDistrictId;
-    }
-  }
-
   return {
     type: 10, // Package Delivery
     specs: {

@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         localStorage.setItem('loli_checkout_token', recoverToken);
         if (cartData.customer) {
           delete cartData.customer.carrier;
-          delete cartData.customer.zone;
         }
         // Save customer data draft to localStorage
         localStorage.setItem('loli_checkout_draft', JSON.stringify(cartData.customer || {}));
@@ -58,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = await api.getSetting('loli_global_settings');
     window._enableBosta = false;
     window._enableEgyptPost = true;
-    window._enableZones = false;
 
     // Load active shipping options
     const options = await api.getSetting('shipping_options');
@@ -67,13 +65,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Failed to load global settings, using defaults', err);
     window._enableBosta = false;
     window._enableEgyptPost = true;
-    window._enableZones = false;
     window._shippingOptions = [];
   }
-
-  // Zone visibility will be handled by updatePriceSummary
-  const zoneGroup = document.getElementById('zone-form-group');
-  const zoneInputEl = document.getElementById('zone');
 
   // Evaluate promotions for checkout
   try {
@@ -233,39 +226,7 @@ async function loadCities() {
 }
 
 async function handleGovChange() {
-  const zoneGroup = document.getElementById('zone-form-group');
-  const zoneInput = document.getElementById('zone');
-  if (zoneGroup) zoneGroup.style.display = 'none';
-  if (zoneInput) {
-    zoneInput.value = '';
-    zoneInput.required = false;
-  }
   updatePriceSummary();
-}
-
-function renderZoneDropdown() {
-  const dropdown = document.getElementById('zone-dropdown');
-  if (dropdown) dropdown.style.display = 'none';
-}
-
-window.selectZone = function(val) {
-  const zoneInput = document.getElementById('zone');
-  if (zoneInput) zoneInput.value = val;
-  const dropdown = document.getElementById('zone-dropdown');
-  if (dropdown) dropdown.style.display = 'none';
-  updatePriceSummary();
-};
-
-document.addEventListener('click', (e) => {
-  const container = document.getElementById('zone-search-container');
-  const dropdown = document.getElementById('zone-dropdown');
-  if (container && !container.contains(e.target) && dropdown) {
-    dropdown.style.display = 'none';
-  }
-});
-
-function getSelectedZoneObject() {
-  return null;
 }
 
 function updateShippingMethodNotice(isEgyptPost) {
@@ -304,13 +265,6 @@ function updatePriceSummary() {
   let shippingFee = 0;
   const isEgyptPost = true;
   window._selectedCarrier = 'egyptpost';
-
-  const zoneGroup = document.getElementById('zone-form-group');
-  const zoneInputEl = document.getElementById('zone');
-  if (zoneGroup && zoneInputEl) {
-    zoneGroup.style.display = 'none';
-    zoneInputEl.required = false;
-  }
 
   const DECLARED_GOV_FEES = {
     'القاهرة': 85,
@@ -376,7 +330,7 @@ function updatePriceSummary() {
     shippingFee = 0;
   }
 
-  // Update Shipping Notice under the zone dropdown
+  // Update Shipping Notice
   updateShippingMethodNotice(isEgyptPost);
 
   let totalDiscount = 0;
@@ -473,7 +427,6 @@ function setupForm() {
   const addressDetailInput = document.getElementById('cust-address-detail');
   const govSearchInput = document.getElementById('government-search');
   const govHiddenInput = document.getElementById('government');
-  const zoneInput = document.getElementById('zone');
 
   function getCombinedAddress() {
     const city = addressCityInput ? addressCityInput.value.trim() : '';
@@ -562,27 +515,9 @@ function setupForm() {
     return true;
   }
 
-  function validateZone() {
-    return true;
-  }
-
-  // Real-time validation listeners
-  if (nameInput) nameInput.addEventListener('input', validateName);
-  if (phoneInput) phoneInput.addEventListener('input', validatePhone);
-  if (phone2Input) phone2Input.addEventListener('input', validatePhone2);
-  if (addressCityInput) addressCityInput.addEventListener('input', validateAddress);
-  if (addressVillageInput) addressVillageInput.addEventListener('input', validateAddress);
-  if (addressDetailInput) addressDetailInput.addEventListener('input', validateAddress);
-
   govSearchInput.addEventListener('blur', () => {
     setTimeout(() => {
       validateGov();
-    }, 200);
-  });
-
-  zoneInput.addEventListener('blur', () => {
-    setTimeout(() => {
-      validateZone();
     }, 200);
   });
 
@@ -595,8 +530,7 @@ function setupForm() {
     const isPhone2Valid = validatePhone2();
     const isGovValid = validateGov();
     const isAddressValid = validateAddress();
-    const isZoneValid = validateZone();
-    const isValid = isNameValid && isPhoneValid && isPhone2Valid && isGovValid && isAddressValid && isZoneValid;
+    const isValid = isNameValid && isPhoneValid && isPhone2Valid && isGovValid && isAddressValid;
 
     if (!isValid) {
       const firstInvalid = form.querySelector('.invalid');
@@ -633,7 +567,6 @@ function setupForm() {
     const cityId = govHiddenInput.value;
     const govData = (window._fullShippingData || []).find(s => s._id === cityId);
     const cityName = govData ? (govData.cityOtherName || govData.city) : '';
-    const zone = zoneInput.value;
 
     const items = Cart.getItems().map(item => {
       const effectiveBase = (item.salePrice && item.salePrice < item.basePrice) ? item.salePrice : item.basePrice;
@@ -657,7 +590,6 @@ function setupForm() {
         secondPhone: convertArabicDigitsToEnglish(phone2Input.value.trim()),
         address: convertArabicDigitsToEnglish(getCombinedAddress()),
         government: cityName,
-        zone: '',
         notes: convertArabicDigitsToEnglish(document.getElementById('cust-notes').value.trim())
       },
       items,
@@ -693,9 +625,8 @@ async function restoreCheckoutDraft() {
     const rawDraft = localStorage.getItem('loli_checkout_draft');
     if (rawDraft) {
       const parsed = JSON.parse(rawDraft);
-      if (parsed.carrier || parsed.zone) {
+      if (parsed.carrier) {
         delete parsed.carrier;
-        delete parsed.zone;
         localStorage.setItem('loli_checkout_draft', JSON.stringify(parsed));
       }
     }
@@ -709,7 +640,6 @@ async function restoreCheckoutDraft() {
   const addressDetailInput = document.getElementById('cust-address-detail');
   const govSearchInput = document.getElementById('government-search');
   const govHiddenInput = document.getElementById('government');
-  const zoneInput = document.getElementById('zone');
   const notesInput = document.getElementById('cust-notes');
 
   const draftStr = localStorage.getItem('loli_checkout_draft');
@@ -787,7 +717,6 @@ function syncAbandonedCart() {
     const cityId = document.getElementById('government')?.value || '';
     const govData = (window._fullShippingData || []).find(s => s._id === cityId);
     const cityName = govData ? (govData.cityOtherName || govData.city) : '';
-    const zone = document.getElementById('zone')?.value || '';
     const notes = document.getElementById('cust-notes')?.value.trim() || '';
 
     const draft = {
@@ -799,7 +728,6 @@ function syncAbandonedCart() {
       addressVillage,
       addressDetail,
       government: cityName,
-      zone: '',
       notes
     };
 

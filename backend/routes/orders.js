@@ -25,7 +25,6 @@ function normalizeCustomerDigits(cust) {
   if (cust.phone) cust.phone = convertArabicDigitsToEnglish(cust.phone);
   if (cust.secondPhone) cust.secondPhone = convertArabicDigitsToEnglish(cust.secondPhone);
   if (cust.address) cust.address = convertArabicDigitsToEnglish(cust.address);
-  if (cust.zone) cust.zone = convertArabicDigitsToEnglish(cust.zone);
   if (cust.notes) cust.notes = convertArabicDigitsToEnglish(cust.notes);
   return cust;
 }

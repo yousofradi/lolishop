@@ -15,7 +15,6 @@ router.get('/', adminAuth, async (req, res) => {
           phone: { $first: "$customer.phone" },
           secondPhone: { $first: "$customer.secondPhone" },
           government: { $first: "$customer.government" },
-          zone: { $first: "$customer.zone" },
           address: { $first: "$customer.address" },
           totalSpent: { $sum: "$paidAmount" },
           orderCount: { $sum: 1 },
@@ -47,7 +46,6 @@ router.get('/:phone', adminAuth, async (req, res) => {
           phone: { $first: "$customer.phone" },
           secondPhone: { $first: "$customer.secondPhone" },
           government: { $first: "$customer.government" },
-          zone: { $first: "$customer.zone" },
           address: { $first: "$customer.address" },
           notes: { $first: "$customer.notes" },
           totalSpent: { $sum: "$paidAmount" },
@@ -78,10 +76,10 @@ router.get('/:phone', adminAuth, async (req, res) => {
 router.put('/:phone', adminAuth, async (req, res) => {
   try {
     const originalPhone = req.params.phone;
-    const { name, phone, secondPhone, government, zone, address } = req.body;
+    const { name, phone, secondPhone, government, address } = req.body;
 
-    if (!name || !phone || !government || !zone || !address) {
-      return res.status(400).json({ error: 'Name, phone, government, zone, and address are required' });
+    if (!name || !phone || !government || !address) {
+      return res.status(400).json({ error: 'Name, phone, government, and address are required' });
     }
 
     // Update all matching orders
@@ -93,7 +91,6 @@ router.put('/:phone', adminAuth, async (req, res) => {
           "customer.phone": phone,
           "customer.secondPhone": secondPhone || '',
           "customer.government": government,
-          "customer.zone": zone,
           "customer.address": address
         }
       }

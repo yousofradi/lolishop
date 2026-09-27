@@ -192,21 +192,17 @@
     }
 
     /* Custom scrollbars for grids */
-    #gov-selector-grid::-webkit-scrollbar,
-    #custom-zones-temp-list::-webkit-scrollbar {
+    #gov-selector-grid::-webkit-scrollbar {
       width: 6px;
     }
-    #gov-selector-grid::-webkit-scrollbar-track,
-    #custom-zones-temp-list::-webkit-scrollbar-track {
+    #gov-selector-grid::-webkit-scrollbar-track {
       background: transparent;
     }
-    #gov-selector-grid::-webkit-scrollbar-thumb,
-    #custom-zones-temp-list::-webkit-scrollbar-thumb {
+    #gov-selector-grid::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 4px;
     }
-    #gov-selector-grid::-webkit-scrollbar-thumb:hover,
-    #custom-zones-temp-list::-webkit-scrollbar-thumb:hover {
+    #gov-selector-grid::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
 
@@ -269,9 +265,6 @@
       }
       #gov-selector-grid {
         max-height: 280px !important;
-      }
-      #custom-zones-temp-list {
-        max-height: 200px !important;
       }
       .bulk-bar {
         width: 100% !important;
@@ -586,41 +579,7 @@
     </div>
   </div>
 
-  <!-- Custom Cities/Zones Modal -->
-  <div id="custom-zones-modal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width:500px; width:95%; border-radius:24px;">
-      <div class="modal-header" style="padding:20px 24px; border-bottom:1px solid #f1f5f9;">
-        <h3 style="font-size:1.15rem; font-weight:800; color:#1e293b;">تحديث المدن المخصصة</h3>
-        <button class="close-btn" onclick="closeCustomZonesModal()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <div class="modal-body" style="padding:24px;">
-        <div style="font-size:0.9rem; color:#64748b; margin-bottom:20px;" id="custom-zones-subtitle">
-          ستضيف مدن/محافظات مخصصة في الإسكندرية
-        </div>
-        
-        <div style="font-weight:800; color:#1e293b; font-size:0.95rem; margin-bottom:12px;">مدن مخصصة</div>
-        
-        <!-- Input for new city -->
-        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
-          <input type="text" id="new-custom-zone-name" placeholder="أدخل اسم المدينة المخصصة" style="width:100%; padding:12px 16px; border:1.5px solid #cbd5e1; border-radius:12px; outline:none; font-size:0.95rem; box-sizing:border-box;">
-          <button onclick="addCustomZoneTemp()" class="theme-secondary-btn" style="padding:12px; font-size:0.95rem; font-weight:700; width:100%; cursor:pointer; box-shadow:none; border-radius:12px; text-align:center;">
-            + أضف مدينة مخصصة
-          </button>
-        </div>
-        
-        <!-- Current custom cities list -->
-        <div id="custom-zones-temp-list" style="display:flex; flex-direction:column; gap:10px; max-height:250px; overflow-y:auto; padding: 4px;">
-          <!-- list of inputs -->
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="closeCustomZonesModal()">إلغاء</button>
-        <button class="btn-submit" onclick="saveCustomZonesSelection()">احفظ</button>
-      </div>
-    </div>
-  </div>
+
 
   <script src="js/api-v2.js?v=20260518_v3"></script>
   <script src="js/auth-v2.js?v=20260518_v3"></script>
@@ -630,7 +589,6 @@
     let selectedIds = new Set();
     let tempSelectedGovs = new Set();
     let currentEditingCityName = "";
-    let tempCustomZones = [];
 
     const EGYPT_GOVERNORATES = [
       "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "البحر الأحمر", "البحيرة", 
@@ -703,8 +661,7 @@
               cost: 65,
               cities: EGYPT_GOVERNORATES.map(gov => ({
                 city: gov,
-                fee: 65,
-                zones: []
+                fee: 65
               }))
             }
           ];
@@ -827,7 +784,6 @@
               </label>
               <div style="display:flex; align-items:center; gap:12px;">
                 <span style="font-weight:800; color:#1e293b; font-size:0.95rem;">${cityObj.city}</span>
-                <button onclick="openCustomZonesModal('${cityObj.city}')" class="theme-secondary-btn" style="border-radius:24px; padding:4px 16px; font-weight:700; font-size:0.8rem; cursor:pointer; outline:none;">تعديل</button>
               </div>
             </div>
             
@@ -907,8 +863,7 @@
           cost: cost,
           cities: EGYPT_GOVERNORATES.map(gov => ({
             city: gov,
-            fee: cost,
-            zones: []
+            fee: cost
           }))
         });
       }
@@ -1021,8 +976,7 @@
           } else {
             newCities.push({
               city: gov,
-              fee: opt.cost,
-              zones: []
+              fee: opt.cost
             });
           }
         }
@@ -1038,88 +992,7 @@
       } catch (e) { showToast('فشل التحديث', 'error'); }
     }
 
-    function openCustomZonesModal(cityName) {
-      currentEditingCityName = cityName;
-      const opt = shippingOptions[currentActiveTabIdx];
-      if (!opt) return;
-      
-      const cityObj = opt.cities.find(c => c.city === cityName);
-      if (!cityObj) return;
-      
-      document.getElementById('custom-zones-subtitle').textContent = `ستضيف مدن/محافظات مخصصة في ${cityName}`;
-      tempCustomZones = [...(cityObj.zones || [])];
-      
-      renderCustomZonesTempList();
-      
-      const modal = document.getElementById('custom-zones-modal');
-      modal.style.display = 'flex';
-      setTimeout(() => modal.classList.add('open'), 10);
-      document.body.classList.add('modal-open');
-      
-      document.getElementById('new-custom-zone-name').value = '';
-    }
 
-    function closeCustomZonesModal() {
-      const modal = document.getElementById('custom-zones-modal');
-      modal.classList.remove('open');
-      setTimeout(() => modal.style.display = 'none', 250);
-      document.body.classList.remove('modal-open');
-    }
-
-    function renderCustomZonesTempList() {
-      const container = document.getElementById('custom-zones-temp-list');
-      if (tempCustomZones.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding:20px; font-weight:700; color:#94a3b8; background:#f8fafc; border-radius:12px;">لا توجد مدن مخصصة حالياً</div>`;
-        return;
-      }
-      
-      container.innerHTML = tempCustomZones.map((zoneName, idx) => `
-        <div style="display:flex; gap:12px; align-items:center;">
-          <input type="text" value="${zoneName}" oninput="updateCustomZoneTempName(${idx}, this.value)" class="form-control" style="flex:1; padding:8px 12px; font-size:0.85rem; border-radius:8px;">
-          <button onclick="deleteCustomZoneTemp(${idx})" style="background:#fee2e2; border:1px solid #ef4444; border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="حذف">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          </button>
-        </div>
-      `).join('');
-    }
-
-    function updateCustomZoneTempName(idx, val) {
-      tempCustomZones[idx] = val.trim();
-    }
-
-    function deleteCustomZoneTemp(idx) {
-      tempCustomZones.splice(idx, 1);
-      renderCustomZonesTempList();
-    }
-
-    function addCustomZoneTemp() {
-      const input = document.getElementById('new-custom-zone-name');
-      const val = input.value.trim();
-      if (!val) { showToast('يرجى إدخال اسم المدينة المخصصة', 'error'); return; }
-      
-      tempCustomZones.push(val);
-      input.value = '';
-      renderCustomZonesTempList();
-      showToast('تمت الإضافة المؤقتة للمدينة');
-    }
-
-    async function saveCustomZonesSelection() {
-      const opt = shippingOptions[currentActiveTabIdx];
-      if (!opt) return;
-      
-      const cityObj = opt.cities.find(c => c.city === currentEditingCityName);
-      if (!cityObj) return;
-      
-      const cleanZones = tempCustomZones.filter(z => z.trim() !== "");
-      cityObj.zones = cleanZones;
-      
-      try {
-        await api.updateSetting('shipping_options', shippingOptions);
-        showToast('تم حفظ المدن المخصصة بنجاح');
-        closeCustomZonesModal();
-        loadShippingOptions();
-      } catch (e) { showToast('فشل حفظ المدن المخصصة', 'error'); }
-    }
 
     function toggleCityRowSelection(city, cb) {
       if (cb.checked) selectedIds.add(city);

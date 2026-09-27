@@ -83,14 +83,6 @@ function renderCustomer() {
   document.getElementById('view-c-phone2').textContent = c.secondPhone || 'لا يوجد هاتف آخر';
   document.getElementById('view-c-address').textContent = c.address || 'لا يوجد عنوان';
   document.getElementById('view-c-gov').textContent = c.government || 'لا يوجد محافظة';
-  
-  const zoneWrapper = document.getElementById('view-c-zone-wrapper');
-  if (window._globalSettings?.enableZones === false) {
-    if (zoneWrapper) zoneWrapper.style.display = 'none';
-  } else {
-    if (zoneWrapper) zoneWrapper.style.display = 'inline';
-    document.getElementById('view-c-zone').textContent = c.zone || 'لا يوجد منطقة';
-  }
 
   const initials = c.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const avatar = document.getElementById('view-c-avatar');
@@ -142,99 +134,13 @@ window.openEditModal = async function () {
     hiddenGov.value = govData ? govData._id : '';
   }
   
-  const zoneContainer = document.getElementById('modal-c-zone-container');
-  if (zoneContainer) {
-    zoneContainer.style.display = window._globalSettings?.enableZones === false ? 'none' : 'block';
-  }
-
-  await handleModalCityChange(true); // skipZoneClear = true
-  document.getElementById('modal-c-zone').value = c.zone || '';
   document.getElementById('modal-c-address').value = c.address || '';
   document.getElementById('edit-modal').classList.add('open');
 };
 
-window.handleModalCityChange = async function (skipZoneClear = false) {
-  const cityId = document.getElementById('modal-c-gov').value;
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (!zoneInput) return;
-
-  if (!skipZoneClear) {
-    zoneInput.value = ''; // Clear current selection
-  }
-  window._modalZones = [];
-
-  if (cityId) {
-    try {
-      const zones = await api.getZones(cityId);
-      window._modalZones = zones || [];
-    } catch (err) {
-      console.error('Failed to fetch modal zones:', err);
-      window._modalZones = [];
-    }
-  }
-
-  const zoneContainer = document.getElementById('modal-c-zone-container');
-  if (zoneContainer) {
-    if (window._globalSettings?.enableZones !== false && window._modalZones && window._modalZones.length > 0) {
-      zoneContainer.style.display = 'block';
-    } else {
-      zoneContainer.style.display = 'none';
-    }
-  }
-  
-  renderModalZoneDropdown();
+window.handleModalCityChange = async function () {
+  // City change handler
 };
-
-window.renderModalZoneDropdown = function () {
-  const dropdown = document.getElementById('modal-c-zone-dropdown');
-  const query = document.getElementById('modal-c-zone').value.toLowerCase().trim();
-  
-  if (!window._modalZones || window._modalZones.length === 0) {
-    dropdown.style.display = 'none';
-    return;
-  }
-
-  // Prevent dropdown from opening if the zone input field is not currently focused by the user
-  const zoneInput = document.getElementById('modal-c-zone');
-  if (document.activeElement !== zoneInput) {
-    dropdown.style.display = 'none';
-    return;
-  }
-
-  const filtered = window._modalZones.filter(z => 
-    z.name.toLowerCase().includes(query) || (z.otherName && z.otherName.toLowerCase().includes(query))
-  );
-
-  dropdown.style.display = 'block';
-  if (filtered.length === 0) {
-    dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد مناطق مطابقة</div>';
-  } else {
-    dropdown.innerHTML = filtered.map(z => {
-      const zoneLabel = api.formatZoneName(z);
-      return `
-        <div class="dropdown-item" onclick="selectModalZone('${zoneLabel.replace(/'/g, "\\'")}')" 
-          style="padding: 10px 16px; cursor: pointer; transition: background 0.2s;"
-          onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-          ${zoneLabel}
-        </div>
-      `;
-    }).join('');
-  }
-}
-
-window.selectModalZone = function(val) {
-  const zoneInput = document.getElementById('modal-c-zone');
-  zoneInput.value = val;
-  document.getElementById('modal-c-zone-dropdown').style.display = 'none';
-};
-
-document.addEventListener('click', (e) => {
-  const container = document.getElementById('modal-c-zone-search-container');
-  const dropdown = document.getElementById('modal-c-zone-dropdown');
-  if (container && !container.contains(e.target)) {
-    dropdown.style.display = 'none';
-  }
-});
 
 function closeEditModal() {
   document.getElementById('edit-modal').classList.remove('open');
@@ -245,15 +151,13 @@ async function applyChanges(btn) {
   const phone = document.getElementById('modal-c-phone').value.trim();
   const phone2 = document.getElementById('modal-c-phone2').value.trim();
   const cityId = document.getElementById('modal-c-gov').value;
-  const zone = document.getElementById('modal-c-zone').value.trim();
   const address = document.getElementById('modal-c-address').value.trim();
 
   const govData = (window._fullShippingData || []).find(s => s._id === cityId);
   const cityName = govData ? (govData.cityOtherName || govData.city) : '';
 
-  const hasZones = window._globalSettings?.enableZones !== false && window._modalZones && window._modalZones.length > 0;
-  if (!name || !phone || !cityName || (hasZones && !zone)) {
-    showToast(hasZones ? 'الاسم ورقم الهاتف والمحافظة والمنطقة مطلوبة' : 'الاسم ورقم الهاتف والمحافظة مطلوبة', 'error');
+  if (!name || !phone || !cityName) {
+    showToast('الاسم ورقم الهاتف والمحافظة مطلوبة', 'error');
     return;
   }
 
@@ -263,13 +167,12 @@ async function applyChanges(btn) {
   }
 
   try {
-    // Call the new API to save the updated customer across all past/current orders in the database
+    // Call the API to save the updated customer across all past/current orders in the database
     await api.updateCustomer(currentCustomer.phone, {
       name,
       phone,
       secondPhone: phone2,
       government: cityName,
-      zone,
       address
     });
 
@@ -278,7 +181,6 @@ async function applyChanges(btn) {
     currentCustomer.phone = phone;
     currentCustomer.secondPhone = phone2;
     currentCustomer.government = cityName;
-    currentCustomer.zone = zone;
     currentCustomer.address = address;
 
     renderCustomer();

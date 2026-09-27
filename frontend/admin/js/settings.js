@@ -95,7 +95,6 @@ function populateSettingsForm(s) {
   const bostaEl = document.getElementById('setting-enable-bosta'); if (bostaEl) bostaEl.checked = false;
   const postEl = document.getElementById('setting-enable-egypt-post'); if (postEl) postEl.checked = s.enableEgyptPost !== false;
   const postFeeEl = document.getElementById('setting-egypt-post-fee'); if (postFeeEl) postFeeEl.value = s.egyptPostFee !== undefined ? s.egyptPostFee : 85;
-  const zonesEl = document.getElementById('setting-enable-zones'); if (zonesEl) zonesEl.checked = s.enableZones !== false;
 
   paymentMethods = s.paymentMethods || [];
   renderPaymentMethods();
@@ -238,8 +237,7 @@ async function saveSettings() {
     paymentMethods: paymentMethods,
     enableBosta: false,
     enableEgyptPost: document.getElementById('setting-enable-egypt-post') ? document.getElementById('setting-enable-egypt-post').checked : (originalSettings.enableEgyptPost !== undefined ? originalSettings.enableEgyptPost : true),
-    egyptPostFee: document.getElementById('setting-egypt-post-fee') ? (parseFloat(document.getElementById('setting-egypt-post-fee').value) || 85) : (originalSettings.egyptPostFee !== undefined ? originalSettings.egyptPostFee : 85),
-    enableZones: false
+    egyptPostFee: document.getElementById('setting-egypt-post-fee') ? (parseFloat(document.getElementById('setting-egypt-post-fee').value) || 85) : (originalSettings.egyptPostFee !== undefined ? originalSettings.egyptPostFee : 85)
   };
 
   try {

@@ -202,7 +202,6 @@ const api = {
   // Shipping
   getShipping() { return this._request('/shipping', { useCache: false }); },
   getPublicShipping() { return this._request('/shipping', { useCache: false }); },
-  getZones(cityId) { return this._request(`/shipping/zones/${cityId}`, { useCache: false }); },
   getShippingList() { return this._request('/shipping/list', { admin: true, useCache: false }); },
   createShipping(d) { return this._request('/shipping', { method: 'POST', body: JSON.stringify(d), admin: true }); },
   updateShipping(id, d) { return this._request(`/shipping/${id}`, { method: 'PUT', body: JSON.stringify(d), admin: true }); },
@@ -391,24 +390,6 @@ const api = {
       body: JSON.stringify({ orderIds }),
       admin: true
     });
-  },
-
-  formatZoneName(z) {
-    if (!z) return '';
-    const main = (z.zoneOtherName || z.otherName || z.name || '').trim();
-    const dist = (z.districtOtherName || z.districtName || '').trim();
-    
-    const normalize = (s) => s.toLowerCase()
-      .replace(/[أإآا]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/ى/g, 'ي')
-      .replace(/\s+/g, '')
-      .trim();
-
-    if (dist && normalize(dist) !== normalize(main)) {
-      return `${main} - ${dist}`;
-    }
-    return main;
   }
 };
 
