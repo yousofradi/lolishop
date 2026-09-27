@@ -82,125 +82,149 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.body.classList.add('is-loading');
 
+  // 1. Settings & shipping options
+  let globalSettings = {};
   try {
-    const [settings, shippingOptionsRes, collectionsRes] = await Promise.all([
-      api.getSetting('loli_global_settings').catch(() => api.getSetting('sundura_global_settings')).catch(() => ({})),
-      api.getSetting('shipping_options').catch(() => []),
-      api.getCollections().catch(() => [])
-    ]);
-
-    window._globalSettings = settings || {};
-    window._shippingOptions = shippingOptionsRes || [];
-
-    // Populate Collections Map and Modal Dropdown
-    const colFilter = document.getElementById('modal-col-filter');
-    if (colFilter) {
-      colFilter.innerHTML = '<option value="">جميع المنتجات</option>';
-      (collectionsRes || []).forEach(c => {
-        collectionsMap[c._id] = c.name;
-        colFilter.add(new Option(c.name, c._id));
-      });
+    let settings = await api.getSetting('loli_global_settings').catch(() => null);
+    if (!settings || typeof settings !== 'object') {
+      settings = await api.getSetting('sundura_global_settings').catch(() => null);
     }
+    if (settings && typeof settings === 'object') {
+      globalSettings = settings;
+    }
+  } catch (e) {
+    console.warn('Error loading settings:', e);
+  }
+  window._globalSettings = globalSettings;
 
-    // Parallel non-blocking background fetch
-    window._shippingPromise = api.getShippingList().then(shippingRes => {
-      window._fullShippingData = shippingRes || [];
-      return shippingRes || [];
-    }).catch(() => {
-      window._fullShippingData = [];
-      return [];
-    });
-
-    window._productsPromise = api.getProducts(1, 1000, true).then(productsRes => {
-      const products = (productsRes.products || productsRes || []).filter(p => p.status !== 'draft');
-      allProducts = products;
-      if (typeof window.renderModalProducts === 'function') {
-        window.renderModalProducts();
-      }
-      return products;
-    }).catch(() => []);
-
-    // Customers payload is heavy and only used for existing customer search autocomplete
-    api.getCustomers().then(customersRes => {
-      allCustomers = customersRes || [];
-    }).catch(() => []);
-
-    window._initialDataPromise = Promise.all([window._shippingPromise, window._productsPromise]);
-
+  try {
+    const shippingOptionsRes = await api.getSetting('shipping_options').catch(() => []);
+    window._shippingOptions = Array.isArray(shippingOptionsRes) ? shippingOptionsRes : [];
     const carrierSelect = document.getElementById('c-carrier');
-    if (carrierSelect && window._shippingOptions && window._shippingOptions.length > 0) {
+    if (carrierSelect && window._shippingOptions.length > 0) {
       carrierSelect.innerHTML = window._shippingOptions.map(o => {
         const val = getCarrierInternalValue(o.name);
         return `<option value="${val}">${o.name}</option>`;
       }).join('');
     }
+  } catch (e) {
+    console.warn('Error setting shipping options:', e);
+  }
 
-    const searchInput = document.getElementById('c-gov-search');
-    const dropdown = document.getElementById('gov-dropdown');
-    const hiddenInput = document.getElementById('c-gov');
-
-    if (searchInput && dropdown) {
-      searchInput.addEventListener('focus', () => renderGovDropdown());
-      searchInput.addEventListener('input', () => renderGovDropdown());
-      
-      document.addEventListener('click', (e) => {
-        if (!document.getElementById('gov-search-container').contains(e.target)) {
-          dropdown.style.display = 'none';
+  // 2. Collections
+  try {
+    const collectionsRes = await api.getCollections().catch(() => []);
+    const colFilter = document.getElementById('modal-col-filter');
+    if (colFilter) {
+      colFilter.innerHTML = '<option value="">جميع المنتجات</option>';
+      const list = Array.isArray(collectionsRes) ? collectionsRes : (collectionsRes?.collections || []);
+      list.forEach(c => {
+        if (c && c._id) {
+          collectionsMap[c._id] = c.name;
+          colFilter.add(new Option(c.name, c._id));
         }
       });
-
-        function renderGovDropdown() {
-          const query = searchInput.value.trim();
-          const shippingList = window._fullShippingData || [];
-          const filtered = shippingList.filter(s => 
-            smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
-          );
-
-        if (filtered.length === 0) {
-          dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد نتائج</div>';
-        } else {
-          dropdown.innerHTML = filtered.map(s => `
-            <div class="dropdown-item" style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; text-align:right;" 
-                 onclick="selectGov('${s._id}', '${s.cityOtherName || s.city}')">
-              ${s.cityOtherName || s.city}
-            </div>
-          `).join('');
-        }
-        dropdown.style.display = 'block';
-      }
-
-      window.selectGov = (id, name) => {
-        hiddenInput.value = id;
-        searchInput.value = name;
-        dropdown.style.display = 'none';
-        handleCityChange(); // Trigger existing city change logic
-      };
     }
-
-    // Populate Payment Methods
-    const paymentMethodsContainer = document.getElementById('payment-methods');
-    if (paymentMethodsContainer && settings.paymentMethods) {
-      paymentMethodsContainer.innerHTML = settings.paymentMethods.map((m, idx) => `
-        <label class="payment-method-card ${idx === 0 ? 'selected' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <input type="radio" name="payment" value="${m.label}" ${idx === 0 ? 'checked' : ''} onchange="updatePaymentUI()" style="margin:0; width: 20px; height: 20px; accent-color: var(--primary);">
-            <div style="text-align: right;">
-              <div style="font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 2px;">${m.label}</div>
-              <div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>
-            </div>
-          </div>
-          <div style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; padding: 4px;">
-            ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`}
-          </div>
-        </label>
-      `).join('');
-    }
-    document.body.classList.remove('is-loading');
-  } catch (err) {
-    console.error('Failed to load store data:', err);
-    showToast('فشل تحميل بيانات المتجر', 'error');
-    document.body.classList.remove('is-loading');
+  } catch (e) {
+    console.warn('Error setting collections:', e);
   }
+
+  // 3. Parallel background fetch for heavy data
+  window._shippingPromise = api.getShippingList().then(shippingRes => {
+    const list = Array.isArray(shippingRes) ? shippingRes : (shippingRes?.shipping || []);
+    window._fullShippingData = list;
+    return list;
+  }).catch((err) => {
+    console.warn('Failed to load shipping list:', err);
+    window._fullShippingData = [];
+    return [];
+  });
+
+  window._productsPromise = api.getProducts(1, 1000, true).then(productsRes => {
+    const rawProducts = Array.isArray(productsRes) ? productsRes : (productsRes?.products || []);
+    const products = rawProducts.filter(p => p && p.status !== 'draft');
+    allProducts = products;
+    if (typeof window.renderModalProducts === 'function') {
+      window.renderModalProducts();
+    }
+    return products;
+  }).catch((err) => {
+    console.warn('Failed to load products:', err);
+    return [];
+  });
+
+  api.getCustomers().then(customersRes => {
+    allCustomers = Array.isArray(customersRes) ? customersRes : (customersRes?.customers || []);
+  }).catch((err) => {
+    console.warn('Failed to load customers:', err);
+    allCustomers = [];
+  });
+
+  window._initialDataPromise = Promise.all([window._shippingPromise, window._productsPromise]);
+
+  // 4. Governorate Search & Dropdown
+  const searchInput = document.getElementById('c-gov-search');
+  const dropdown = document.getElementById('gov-dropdown');
+  const hiddenInput = document.getElementById('c-gov');
+
+  if (searchInput && dropdown) {
+    searchInput.addEventListener('focus', () => renderGovDropdown());
+    searchInput.addEventListener('input', () => renderGovDropdown());
+    
+    document.addEventListener('click', (e) => {
+      const container = document.getElementById('gov-search-container');
+      if (container && !container.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    function renderGovDropdown() {
+      const query = (searchInput.value || '').trim();
+      const shippingList = Array.isArray(window._fullShippingData) ? window._fullShippingData : [];
+      const filtered = shippingList.filter(s => 
+        smartMatch(s.city, query) || (s.cityOtherName && smartMatch(s.cityOtherName, query))
+      );
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center;">لا توجد نتائج</div>';
+      } else {
+        dropdown.innerHTML = filtered.map(s => `
+          <div class="dropdown-item" style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; text-align:right;" 
+               onclick="selectGov('${s._id}', '${(s.cityOtherName || s.city || '').replace(/'/g, "\\'")}')">
+            ${s.cityOtherName || s.city}
+          </div>
+        `).join('');
+      }
+      dropdown.style.display = 'block';
+    }
+
+    window.selectGov = (id, name) => {
+      if (hiddenInput) hiddenInput.value = id;
+      if (searchInput) searchInput.value = name;
+      dropdown.style.display = 'none';
+      handleCityChange();
+    };
+  }
+
+  // 5. Populate Payment Methods (if provided by settings)
+  const paymentMethodsContainer = document.getElementById('payment-methods');
+  if (paymentMethodsContainer && Array.isArray(globalSettings.paymentMethods) && globalSettings.paymentMethods.length > 0) {
+    paymentMethodsContainer.innerHTML = globalSettings.paymentMethods.map((m, idx) => `
+      <label class="payment-method-card ${idx === 0 ? 'selected' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <input type="radio" name="payment" value="${m.label}" ${idx === 0 ? 'checked' : ''} onchange="updatePaymentUI()" style="margin:0; width: 20px; height: 20px; accent-color: var(--primary);">
+          <div style="text-align: right;">
+            <div style="font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 2px;">${m.label}</div>
+            <div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>
+          </div>
+        </div>
+        <div style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; padding: 4px;">
+          ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`}
+        </div>
+      </label>
+    `).join('');
+  }
+  document.body.classList.remove('is-loading');
 
   setupSearch();
   setupCustomerSearch();
@@ -1130,7 +1154,13 @@ window.selectCustomer = async function (phone) {
     } catch (_) {}
   }
 
-  const customer = allCustomers.find(c => String(c.phone).trim() === String(phone).trim());
+  const clean = (p) => String(p || '').replace(/[^0-9]/g, '').replace(/^20/, '0').replace(/^2/, '');
+  const targetClean = clean(phone);
+  const customer = allCustomers.find(c => 
+    String(c.phone).trim() === String(phone).trim() ||
+    (c._id && String(c._id).trim() === String(phone).trim()) ||
+    (targetClean && clean(c.phone) === targetClean)
+  );
   if (!customer) return;
 
   const nameEl = document.getElementById('c-name');

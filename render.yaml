@@ -27,9 +27,6 @@ services:
       - key: API_URL
         sync: false
     headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=3600
       - path: /assets/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
@@ -38,7 +35,10 @@ services:
         value: public, max-age=86400
       - path: /js/*
         name: Cache-Control
-        value: public, max-age=86400
+        value: no-cache, must-revalidate
+      - path: /*
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
     routes:
       - type: rewrite
         source: /collection/*
