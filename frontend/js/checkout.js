@@ -242,6 +242,13 @@ function updateShippingMethodNotice(isEgyptPost) {
   // Removed notice alert per user request
 }
 
+function getActiveShippingOption() {
+  if (Array.isArray(window._shippingOptions) && window._shippingOptions.length > 0) {
+    return window._shippingOptions.find(o => o.active !== false) || window._shippingOptions[0];
+  }
+  return null;
+}
+
 function updatePriceSummary() {
   const items = Cart.getItems();
   const subtotal = Cart.getTotal();
@@ -272,10 +279,8 @@ function updatePriceSummary() {
   const cityName = govData ? (govData.cityOtherName || govData.city) : (searchInputVal || govInputVal);
 
   let shippingFee = 0;
-  let activeShippingOption = null;
-  if (Array.isArray(window._shippingOptions) && window._shippingOptions.length > 0) {
-    activeShippingOption = window._shippingOptions.find(o => o.active !== false) || window._shippingOptions[0];
-  }
+  const activeShippingOption = getActiveShippingOption();
+  window._activeShippingOption = activeShippingOption;
   window._selectedCarrier = (activeShippingOption && activeShippingOption.name) ? activeShippingOption.name : '';
 
   if (cityName) {
@@ -550,6 +555,9 @@ function setupForm() {
       };
     });
 
+    const activeOption = window._activeShippingOption || getActiveShippingOption();
+    const carrier = (activeOption && activeOption.name) ? activeOption.name : (window._selectedCarrier || '');
+
     const orderData = {
       customer: {
         name: convertArabicDigitsToEnglish(nameInput.value.trim()),
@@ -561,7 +569,7 @@ function setupForm() {
       },
       items,
       paymentMethod: payment.value,
-      carrier: (activeShippingOption && activeShippingOption.name) ? activeShippingOption.name : (window._selectedCarrier || ''),
+      carrier,
       shippingFee: window._currentShippingFee !== undefined ? window._currentShippingFee : 0
     };
 
