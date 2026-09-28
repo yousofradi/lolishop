@@ -695,14 +695,21 @@ window.shipOrders = async function () {
   const btn = document.getElementById('ship-orders-btn');
   const originalHtml = btn ? btn.innerHTML : 'شحن الطلبات';
 
-  const ordersToShip = allOrdersData.filter(o => 
-    o.status === 'ready' && 
-    (o.paid === true || (o.paidAmount && o.paidAmount > 0)) && 
-    !o.bostaDeliveryId
-  );
+  const checkedCheckboxes = document.querySelectorAll('.order-checkbox:checked');
+  let ordersToShip = [];
+  if (checkedCheckboxes.length > 0) {
+    const selectedIds = Array.from(checkedCheckboxes).map(cb => cb.value);
+    ordersToShip = allOrdersData.filter(o => selectedIds.includes(o.orderId));
+  } else {
+    ordersToShip = allOrdersData.filter(o => 
+      o.status === 'ready' && 
+      (o.paid === true || (o.paidAmount && o.paidAmount > 0)) && 
+      !o.bostaDeliveryId
+    );
+  }
 
   if (ordersToShip.length === 0) {
-    showToast('لا توجد طلبات مدفوعة جاهزة للشحن حالياً', 'info');
+    showToast('لا توجد طلبات جاهزة للشحن حالياً', 'info');
     return;
   }
 
@@ -722,27 +729,39 @@ window.shipOrders = async function () {
       throw new Error('مكتبة ExcelJS لم يتم تحميلها بشكل صحيح');
     }
 
-    const cityMap = {
-      "القاهره": "CAIRO", "الجيزه": "GIZA", "الاسكندريه": "ALEXANDRIA",
-      "البحيره": "BEHIRA", "القليوبيه": "QALIUBIA", "الغربيه": "GHARBIA",
-      "المنوفيه": "MONOUFIA", "دمياط": "DOMITTA", "الدقهليه": "DAKAHLIA",
-      "كفر الشيخ": "KAFR EL SHEIKH", "مطروح": "MARSA MATROUH", "الاسماعيليه": "ISMAILIA",
-      "السويس": "SUEZ", "بور سعيد": "PORT SAID", "الشرقيه": "SHARKIA",
-      "الفيوم": "FAYOUM", "بني سويف": "BANI SWEIF", "المنيا": "MENIA",
-      "اسيوط": "ASSIUT", "سوهاج": "SOUHAGE", "قنا": "QENA",
-      "اسوان": "ASWAN", "الاقصر": "LOUXOR", "البحر الاحمر": "RED SEA",
-      "الوادي الجديد": "NEW VALLLEY", "شمال سيناء": "NOURTH SINAI", "جنوب سيناء": "SOUTH SINAI"
-    };
-
-    const res = await fetch('Template.xlsx');
-    if (!res.ok) throw new Error('لم يتم العثور على ملف Template.xlsx');
-    const buffer = await res.arrayBuffer();
+    let buffer;
+    try {
+      const res = await fetch('Template.xlsx');
+      if (res.ok) {
+        buffer = await res.arrayBuffer();
+      } else {
+        const res2 = await fetch('order_template.xls');
+        if (res2.ok) buffer = await res2.arrayBuffer();
+      }
+    } catch (e) {
+      console.warn('Could not fetch template file:', e);
+    }
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    
-    // Get the first worksheet
-    const sheet = workbook.getWorksheet(1) || workbook.worksheets[0];
+    if (buffer) {
+      await workbook.xlsx.load(buffer);
+    }
+
+    let sheet = workbook.getWorksheet(1) || workbook.worksheets[0];
+    if (!sheet) {
+      sheet = workbook.addWorksheet('Sheet1');
+      sheet.addRow([
+        'الرقم المرجعي',
+        'اسم المستلم',
+        'موبايل المستلم',
+        'Receiver Second Mobile Number',
+        'منطقة المستلم',
+        'عنوان المستلم',
+        'Product Note',
+        'ملاحظة',
+        'مجموع التحصيل'
+      ]);
+    }
     
     // Find column mapping from row 1
     const headers = sheet.getRow(1).values;
@@ -750,6 +769,17 @@ window.shipOrders = async function () {
     for (let i = 1; i < headers.length; i++) {
       if (headers[i]) colMap[headers[i].toString().trim()] = i;
     }
+
+    const getCol = (name, fallbackIdx) => colMap[name] || fallbackIdx;
+    const colRef = getCol('الرقم المرجعي', 1);
+    const colName = getCol('اسم المستلم', 2);
+    const colPhone = getCol('موبايل المستلم', 3);
+    const colSecondPhone = getCol('Receiver Second Mobile Number', 4);
+    const colGov = getCol('منطقة المستلم', 5);
+    const colAddress = colMap['عنوان المستلم'] || colMap['عنوان المستلم '] || 6;
+    const colProductNote = getCol('Product Note', 7);
+    const colNote = getCol('ملاحظة', 8);
+    const colCod = getCol('مجموع التحصيل', 9);
 
     function convertArabicDigitsToEnglish(str) {
       if (str === null || str === undefined) return '';
@@ -763,32 +793,36 @@ window.shipOrders = async function () {
       const o = ordersToShip[i];
       const row = sheet.getRow(rowIdx);
 
-      let remainingAmount = Math.max(0, o.totalPrice - (o.paidAmount || 0));
-      if (remainingAmount > 0) {
-        const codFee = Math.max(10, Math.ceil((remainingAmount * 0.01) / 5) * 5);
-        remainingAmount = remainingAmount + codFee;
+      // Cod Without shipping Fee
+      let cod = 0;
+      if (!o.paid) {
+        const remaining = Math.max(0, (o.totalPrice || 0) - (o.paidAmount || 0));
+        const unpaidShipping = Math.max(0, (o.shippingFee || 0) - (o.paidAmount || 0));
+        cod = Math.max(0, remaining - unpaidShipping);
       }
 
-      const secondPhone = o.customer.secondPhone ? convertArabicDigitsToEnglish(o.customer.secondPhone) : '';
-      const note = `تسليم بدون بطاقة - برجاء معامله المنتج برفق قابل للكسر${secondPhone ? ' | ت: ' + secondPhone : ''}`;
-      const govEn = cityMap[o.customer.government] || o.customer.government;
+      const customerName = (o.customer && o.customer.name) ? o.customer.name.trim() : '';
+      const phone = (o.customer && o.customer.phone) ? convertArabicDigitsToEnglish(o.customer.phone).trim() : '';
+      const secondPhone = (o.customer && o.customer.secondPhone) ? convertArabicDigitsToEnglish(o.customer.secondPhone).trim() : '';
+      const gov = (o.customer && o.customer.government) ? o.customer.government.trim() : '';
+      const address = (o.customer && o.customer.address) ? o.customer.address.trim() : '';
 
-      const orderDate = o.paidAt ? new Date(o.paidAt) : (o.createdAt ? new Date(o.createdAt) : new Date());
-      const monthName = orderDate.toLocaleString('en-US', { month: 'long' });
-      const rawId = (o.orderId || '').toString();
-      const formattedOrderId = rawId.startsWith('Order-') ? rawId : `Order-${rawId}`;
-      const descValue = `ادوات مكتبية - قابل للكسر\n(${formattedOrderId},${monthName})`;
+      // Product Note: Products of order eg : ProductName (count) , .....
+      const productNote = (o.items || [])
+        .map(item => `${(item.name || '').trim()} (${item.quantity || 1})`)
+        .join(' , ');
 
-      if (colMap['Description']) row.getCell(colMap['Description']).value = descValue;
-      if (colMap['Total_Weight']) row.getCell(colMap['Total_Weight']).value = "1600";
-      if (colMap['Package_volume']) row.getCell(colMap['Package_volume']).value = "Small";
-      if (colMap['COD_Value']) row.getCell(colMap['COD_Value']).value = remainingAmount;
-      if (colMap['Item_Special_Notes']) row.getCell(colMap['Item_Special_Notes']).value = convertArabicDigitsToEnglish(note);
-      if (colMap['Customer_Name']) row.getCell(colMap['Customer_Name']).value = convertArabicDigitsToEnglish(o.customer.name);
-      if (colMap['Mobile_No']) row.getCell(colMap['Mobile_No']).value = convertArabicDigitsToEnglish(o.customer.phone);
-      if (colMap['Street']) row.getCell(colMap['Street']).value = convertArabicDigitsToEnglish(o.customer.address);
-      if (colMap['City']) row.getCell(colMap['City']).value = govEn;
-      if (colMap['HasPOD']) row.getCell(colMap['HasPOD']).value = "no";
+      const fixedNote = 'برجاء معاملة المنتج برفق قابل للكسر';
+
+      row.getCell(colRef).value = (o.orderId || '').toString();
+      row.getCell(colName).value = customerName;
+      row.getCell(colPhone).value = phone;
+      row.getCell(colSecondPhone).value = secondPhone;
+      row.getCell(colGov).value = gov;
+      row.getCell(colAddress).value = address;
+      row.getCell(colProductNote).value = productNote;
+      row.getCell(colNote).value = fixedNote;
+      row.getCell(colCod).value = cod;
       
       rowIdx++;
       
