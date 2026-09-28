@@ -122,7 +122,7 @@ function renderPaymentMethods(globalSettings) {
           </span>
           <div style="text-align: right;">
             <div style="font-weight: 700; font-size: 0.95rem; color: #1e293b;">${m.label}</div>
-            ${(m.accountHolder || m.recipientName) ? `<div style="font-size: 0.8rem; color: #475569; font-weight: 600;">المحول إليه: <span style="color:#0f172a;">${m.accountHolder || m.recipientName}</span></div>` : ''}
+            ${(m.accountHolder || m.recipientName) ? `<div style="font-size: 0.8rem; color: #475569; font-weight: 600;">الرقم ب اسم : <span style="color:#0f172a; font-weight:800;">${m.accountHolder || m.recipientName}</span></div>` : ''}
             ${m.number ? `<div style="font-size: 0.85rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px;">${m.number}</div>` : ''}
           </div>
         </div>

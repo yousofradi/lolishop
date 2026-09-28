@@ -113,24 +113,30 @@ async function loadPaymentMethods() {
     container.innerHTML = methods.map((m, idx) => `
       <div class="radio-option">
         <input type="radio" name="payment" id="pay-${m.id}" value="${m.label}" ${idx === 0 ? 'checked' : ''}>
-        <label for="pay-${m.id}" style="justify-content: space-between; padding: 12px 16px; border-radius:12px; border-width:1.5px; align-items:center;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; background:#f8fafc; border-radius:8px;">
-               ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'}
+        <label for="pay-${m.id}" style="display:flex; flex-direction:column; padding: 12px 16px; border-radius:12px; border-width:1.5px; width:100%; box-sizing:border-box;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; background:#f8fafc; border-radius:8px;">
+                 ${m.logo ? `<img src="${m.logo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'}
+              </div>
+              <span style="font-weight:700; font-size:0.95rem; color:var(--text-main);">${m.label}</span>
             </div>
-            <div>
-              <span style="font-weight:700; font-size:0.95rem; color:var(--text-main); display:block;">${m.label}</span>
-              ${(m.accountHolder || m.recipientName) ? `<div style="font-size:0.8rem; color:#64748b; margin-top:2px;">اسم المحول إليه: <strong style="color:var(--primary, #916C4F);">${m.accountHolder || m.recipientName}</strong></div>` : ''}
+            
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn-copy-payment" onclick="event.preventDefault(); copyToClipboard('${m.number}', this)" style="background:var(--primary, #916C4F); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>نسخ</span>
+              </button>
+              <span dir="ltr" style="font-size: 0.85rem; font-weight: 800; color: #111827;">${m.number}</span>
             </div>
           </div>
-          
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="btn-copy-payment" onclick="event.preventDefault(); copyToClipboard('${m.number}', this)" style="background:var(--primary, #916C4F); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.2s;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span>نسخ</span>
-            </button>
-            <span dir="ltr" style="font-size: 0.85rem; font-weight: 800; color: #111827;">${m.number}</span>
-          </div>
+
+          ${(m.accountHolder || m.recipientName) ? `
+            <div style="width:100%; margin-top:10px; padding:6px 12px; background:#f8fafc; border:1px dashed #e2e8f0; border-radius:8px; display:flex; align-items:center; gap:6px; font-size:0.85rem; box-sizing:border-box;">
+              <span style="color:#64748b; font-weight:600;">الرقم ب اسم :</span>
+              <strong style="color:var(--primary, #916C4F); font-weight:800;">${m.accountHolder || m.recipientName}</strong>
+            </div>
+          ` : ''}
         </label>
       </div>
     `).join('');

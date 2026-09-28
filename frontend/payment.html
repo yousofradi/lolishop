@@ -136,8 +136,9 @@
            </div>
         </div>
         ${holderName ? `
-          <div style="font-size:1rem; color:#475569; margin: 8px 0; font-weight:700; background:#f8fafc; padding:8px 16px; border-radius:10px; border:1px solid #e2e8f0; width:100%; text-align:center; box-sizing:border-box;">
-            اسم المحول إليه: <strong style="color:var(--primary, #0f172a); font-weight:800;">${holderName}</strong>
+          <div style="font-size:0.95rem; color:#475569; margin: 8px 0; font-weight:700; background:#f8fafc; padding:8px 16px; border-radius:10px; border:1px solid #e2e8f0; width:100%; text-align:center; box-sizing:border-box; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span style="color:#64748b;">الرقم ب اسم :</span>
+            <strong style="color:var(--primary, #0f172a); font-weight:800;">${holderName}</strong>
           </div>
         ` : ''}
         <span class="method-number" id="pay-number">${selected.number}</span>
