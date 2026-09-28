@@ -793,12 +793,24 @@ window.shipOrders = async function () {
       const o = ordersToShip[i];
       const row = sheet.getRow(rowIdx);
 
-      // Cod Without shipping Fee
+      // Cod Without shipping Fee: المجموع الجزئي - المدفوع
       let cod = 0;
       if (!o.paid) {
-        const remaining = Math.max(0, (o.totalPrice || 0) - (o.paidAmount || 0));
-        const unpaidShipping = Math.max(0, (o.shippingFee || 0) - (o.paidAmount || 0));
-        cod = Math.max(0, remaining - unpaidShipping);
+        let subtotal = (o.subtotal !== undefined && o.subtotal !== null) ? Number(o.subtotal) : 0;
+        if (!subtotal && Array.isArray(o.items) && o.items.length > 0) {
+          subtotal = o.items.reduce((sum, item) => {
+            const itemPrice = (item.finalPrice !== undefined && item.finalPrice !== null)
+              ? Number(item.finalPrice)
+              : Math.max(0, ((Number(item.basePrice) || 0) * (Number(item.quantity) || 1)) - (Number(item.discount) || 0));
+            return sum + itemPrice;
+          }, 0);
+        }
+        if (!subtotal && o.totalPrice !== undefined) {
+          subtotal = Math.max(0, (Number(o.totalPrice) || 0) - (Number(o.shippingFee) || 0) + (Number(o.discount) || 0));
+        }
+
+        const paidAmount = Number(o.paidAmount) || 0;
+        cod = Math.max(0, subtotal - paidAmount);
       }
 
       const customerName = (o.customer && o.customer.name) ? o.customer.name.trim() : '';
