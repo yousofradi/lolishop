@@ -711,25 +711,12 @@ function updatePaymentStatusUI() {
   const o = currentOrder;
   const remaining = Math.max(0, o.totalPrice - (o.paidAmount || 0));
 
-  let codFee = 0;
-  if (remaining > 0) {
-    codFee = Math.max(10, Math.ceil((remaining * 0.01) / 5) * 5);
-  }
-
-  const displayRemaining = remaining > 0 ? (remaining + codFee) : 0;
-
   const codFeeRow = document.getElementById('sum-collection-fee-row');
   if (codFeeRow) {
-    if (codFee > 0) {
-      codFeeRow.style.display = 'flex';
-      const el = document.getElementById('sum-collection-fee');
-      if (el) el.textContent = formatPrice(codFee);
-    } else {
-      codFeeRow.style.display = 'none';
-    }
+    codFeeRow.style.display = 'none';
   }
 
-  document.getElementById('sum-remaining').textContent = formatPrice(displayRemaining);
+  document.getElementById('sum-remaining').textContent = formatPrice(remaining);
 
   const btn = document.getElementById('btn-mark-paid');
   const badge = document.getElementById('view-payment-status');

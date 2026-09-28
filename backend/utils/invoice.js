@@ -123,12 +123,7 @@ async function generateInvoiceInnerHtml(order, settings, options = {}) {
   const total = num(order.totalPrice);
   const paid = num(order.paidAmount);
   const remaining = total - paid;
-  // Add extra fee if not fully paid (COD fee logic: 1% with 10 EGP min, rounded to nearest 5)
-  let codFee = 0;
-  if (remaining > 0) {
-    codFee = Math.max(10, Math.ceil((remaining * 0.01) / 5) * 5);
-  }
-  const displayRemaining = remaining > 0 ? (remaining + codFee) : 0;
+  const displayRemaining = remaining > 0 ? remaining : 0;
   let promotionRewardsText = Array.isArray(order.appliedPromotionRewards) && order.appliedPromotionRewards.length > 0
     ? order.appliedPromotionRewards.filter(Boolean).join(' و ')
     : (order.appliedPromotionRewardText ? order.appliedPromotionRewardText : '');
@@ -163,9 +158,9 @@ async function generateInvoiceInnerHtml(order, settings, options = {}) {
   }
 
   // ================== REMAINING TEXT ==================
-  let remtext = `المتبقي عند الاستلام (+${codFee} ج رسوم)`;
+  let remtext = 'المتبقي عند الاستلام';
   let remainingValue = `${displayRemaining} ج`;
-  if (remaining === 0) {
+  if (remaining <= 0) {
     remtext = 'المتبقي';
     remainingValue = 'مدفوع بالكامل';
   }

@@ -234,11 +234,7 @@ async function sendWebhookInner(event, data, options = {}) {
 
           // Calculate amounts
           const baseRemaining = (data.totalPrice || 0) - (data.paidAmount || 0);
-          let codFee = 0;
-          if (baseRemaining > 0) {
-            codFee = Math.max(10, Math.ceil((baseRemaining * 0.01) / 5) * 5);
-          }
-          const displayRemaining = baseRemaining > 0 ? (baseRemaining + codFee) : 0;
+          const displayRemaining = baseRemaining > 0 ? baseRemaining : 0;
           const remainingText = baseRemaining > 0 ? `الدفع عند الاستلام : ${displayRemaining} EGP` : `مدفوع بالكامل`;
 
           // Prepare Customer Message
